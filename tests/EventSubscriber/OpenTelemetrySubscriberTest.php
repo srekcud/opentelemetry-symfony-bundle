@@ -227,4 +227,35 @@ final class OpenTelemetrySubscriberTest extends TestCase
         self::assertSame('https', $attributes['url.scheme']);
         self::assertSame('example.com', $attributes['server.address']);
     }
+
+    public function testQueryStringCaptured(): void
+    {
+        $request = Request::create('/api/items?page=2&limit=10', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+
+        $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onFinishRequestDetachScope(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onTerminate(new TerminateEvent($kernel, $request, new Response()));
+
+        $spans = $this->exporter->getSpans();
+        $attributes = $spans[0]->getAttributes()->toArray();
+
+        self::assertStringContainsString('page=2', $attributes['url.query']);
+        self::assertStringContainsString('limit=10', $attributes['url.query']);
+    }
+
+    public function testQueryStringNullWhenAbsent(): void
+    {
+        $request = Request::create('/api/items', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+
+        $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onFinishRequestDetachScope(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onTerminate(new TerminateEvent($kernel, $request, new Response()));
+
+        $spans = $this->exporter->getSpans();
+        $attributes = $spans[0]->getAttributes()->toArray();
+
+        self::assertArrayNotHasKey('url.query', $attributes);
+    }
 }

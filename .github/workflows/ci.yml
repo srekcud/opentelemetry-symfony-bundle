@@ -34,10 +34,13 @@ jobs:
         include:
           - php: '8.1'
             symfony: '6.4.*'
+            coverage: false
           - php: '8.2'
             symfony: '7.4.*'
+            coverage: true
           - php: '8.4'
             symfony: '8.0.*'
+            coverage: false
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +48,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          coverage: none
+          coverage: ${{ matrix.coverage && 'xdebug' || 'none' }}
 
       - name: Restrict Symfony version
         run: |
@@ -60,4 +63,16 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Run PHPUnit
+        if: ${{ !matrix.coverage }}
         run: vendor/bin/phpunit
+
+      - name: Run PHPUnit with coverage
+        if: ${{ matrix.coverage }}
+        run: vendor/bin/phpunit --coverage-clover coverage.xml
+
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.coverage }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}

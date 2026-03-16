@@ -295,6 +295,7 @@ final class OpenTelemetrySubscriber implements EventSubscriberInterface
             HttpAttributes::HTTP_REQUEST_METHOD => $request->getMethod(),
             UrlAttributes::URL_FULL => $request->getUri(),
             UrlAttributes::URL_PATH => $request->getPathInfo(),
+            UrlAttributes::URL_QUERY => $request->getQueryString(),
             UrlAttributes::URL_SCHEME => $request->getScheme(),
             ServerAttributes::SERVER_ADDRESS => $request->getHost(),
             ServerAttributes::SERVER_PORT => $request->getPort(),
