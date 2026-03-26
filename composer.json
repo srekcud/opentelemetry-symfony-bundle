@@ -30,6 +30,8 @@
         "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
     },
     "suggest": {
+        "open-telemetry/exporter-otlp": "Required to export traces via OTLP (the most common protocol for OpenTelemetry backends)",
+        "php-http/guzzle7-adapter": "HTTP transport for the OTLP exporter (or use any PSR-18 client)",
         "doctrine/dbal": "Required for automatic Doctrine DBAL query tracing (^4.0)",
         "symfony/cache": "Required for automatic cache pool tracing (get/delete/invalidateTags)",
         "symfony/http-client": "Required for automatic HttpClient outgoing request tracing",
