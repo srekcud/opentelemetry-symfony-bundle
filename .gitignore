@@ -4,3 +4,4 @@ composer.lock
 .phpunit.result.cache
 phpunit.xml
 coverage.xml
+.DS_Store
