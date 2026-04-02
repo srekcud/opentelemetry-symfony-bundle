@@ -17,7 +17,6 @@ use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
-use Traceway\OpenTelemetryBundle\OpenTelemetryBundle;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
 final class OpenTelemetrySubscriberTest extends TestCase
