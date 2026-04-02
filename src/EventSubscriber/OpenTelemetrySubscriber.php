@@ -330,8 +330,6 @@ final class OpenTelemetrySubscriber implements EventSubscriberInterface
             }
         }
 
-        $attributes[ServiceAttributes::SERVICE_VERSION] = OpenTelemetryBundle::VERSION;
-
         return $attributes;
     }
 }
