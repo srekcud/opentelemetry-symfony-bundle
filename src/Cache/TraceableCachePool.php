@@ -135,7 +135,9 @@ class TraceableCachePool implements CacheInterface, AdapterInterface, ResetInter
     public function clear(string $prefix = ''): bool
     {
         if (!$this->isEnabled()) {
-            return $this->pool->clear($prefix);
+            return $this->pool instanceof AdapterInterface
+                ? $this->pool->clear($prefix)
+                : $this->pool->clear();
         }
 
         $span = $this->getTracer()
@@ -145,7 +147,11 @@ class TraceableCachePool implements CacheInterface, AdapterInterface, ResetInter
             ->startSpan();
 
         try {
-            return $this->pool->clear($prefix);
+            $result = $this->pool instanceof AdapterInterface
+                ? $this->pool->clear($prefix)
+                : $this->pool->clear();
+
+            return $result;
         } catch (\Throwable $e) {
             $span->recordException($e);
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
