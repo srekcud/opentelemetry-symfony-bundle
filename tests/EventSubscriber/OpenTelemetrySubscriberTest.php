@@ -296,7 +296,7 @@ final class OpenTelemetrySubscriberTest extends TestCase
         );
     }
 
-    public function testServiceVersionAttributePresent(): void
+    public function testServiceVersionAttributeIsNotPresent(): void
     {
         $request = Request::create('/api/items', 'GET');
         $kernel = $this->createStub(HttpKernelInterface::class);
@@ -308,7 +308,7 @@ final class OpenTelemetrySubscriberTest extends TestCase
         $spans = $this->exporter->getSpans();
         $attributes = $spans[0]->getAttributes()->toArray();
 
-        self::assertSame(OpenTelemetryBundle::VERSION, $attributes['service.version']);
+        self::assertArrayNotHasKey('service.version', $attributes);
     }
 
     public function testIncomingTraceContextCreatesChildSpan(): void
