@@ -11,8 +11,6 @@ use Traceway\OpenTelemetryBundle\DependencyInjection\Compiler\HttpClientTracingP
 
 final class OpenTelemetryBundle extends Bundle
 {
-    public const VERSION = '1.4.0';
-
     public function getPath(): string
     {
         return \dirname(__DIR__);

@@ -39,6 +39,10 @@ vendor/bin/phpstan analyse
 5. Commit your changes with a clear message
 6. Push to your fork and open a Pull Request
 
+## Releases
+
+Releases are managed by maintainers. When a new version is ready, a git tag is pushed (e.g., `v1.5.0`) and a GitHub Release is created with the changelog entry.
+
 ## Reporting Bugs
 
 Please open an issue at [github.com/tracewayapp/opentelemetry-symfony-bundle/issues](https://github.com/tracewayapp/opentelemetry-symfony-bundle/issues) with:

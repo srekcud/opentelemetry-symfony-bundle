@@ -55,9 +55,4 @@ final class OpenTelemetryBundleTest extends TestCase
 
         self::assertTrue($found, 'CacheTracingPass should be registered');
     }
-
-    public function testVersionConstant(): void
-    {
-        self::assertSame('1.4.0', OpenTelemetryBundle::VERSION);
-    }
 }
