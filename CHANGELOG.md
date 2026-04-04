@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-04-04
+
+### Changed
+
+- **Doctrine DBAL 3 graceful degradation** — removed the `doctrine/dbal: <4.0` conflict rule from `composer.json` so the bundle can be installed alongside DBAL 3; Doctrine tracing is now auto-disabled via Symfony config normalization when DBAL < 4.0 is detected, keeping all other instrumentations (HTTP, Console, Messenger, Cache, Twig, Monolog) fully functional ([#8](https://github.com/tracewayapp/opentelemetry-symfony-bundle/issues/8))
+
 ## [1.4.2] - 2026-04-03
 
 ### Added
@@ -179,6 +185,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Messenger root spans for task-oriented backends (Traceway, Sentry)
 - 58 unit tests with 131 assertions
 
+[1.4.3]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.3.3...v1.4.0

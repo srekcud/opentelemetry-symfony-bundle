@@ -79,8 +79,28 @@ final class Configuration implements ConfigurationInterface
                     ->defaultFalse()
                 ->end()
                 ->booleanNode('doctrine_enabled')
-                    ->info('Instrument Doctrine DBAL: auto-create CLIENT spans for database queries.')
+                    ->info('Instrument Doctrine DBAL: auto-create CLIENT spans for database queries. Requires doctrine/dbal ^4.0; auto-disabled when DBAL 3.x is installed.')
                     ->defaultTrue()
+                    ->beforeNormalization()
+                        ->ifTrue(static function ($v): bool {
+                            if ($v !== true) {
+                                return false;
+                            }
+
+                            if (!class_exists(\Composer\InstalledVersions::class)) {
+                                return false;
+                            }
+
+                            try {
+                                $version = \Composer\InstalledVersions::getVersion('doctrine/dbal');
+                            } catch (\OutOfBoundsException) {
+                                return false; // doctrine/dbal not installed
+                            }
+
+                            return $version !== null && version_compare($version, '4.0.0', '<');
+                        })
+                        ->then(static fn () => false)
+                    ->end()
                 ->end()
                 ->booleanNode('doctrine_record_statements')
                     ->info('Record SQL on spans. Prepared statements use ? placeholders; query()/exec() record raw SQL which may contain literal values. Disable in production if raw SQL may contain sensitive data.')
