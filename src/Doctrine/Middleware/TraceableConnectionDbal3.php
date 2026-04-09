@@ -13,7 +13,6 @@ use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerInterface;
 
-
 final class TraceableConnectionDbal3 extends AbstractConnectionMiddleware
 {
     private ?TracerInterface $tracer = null;
