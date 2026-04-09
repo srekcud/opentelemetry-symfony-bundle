@@ -92,13 +92,15 @@ final class TraceableConnectionDbal3 extends AbstractConnectionMiddleware
     public function beginTransaction(): bool
     {
         if (!$this->isEnabled()) {
-            return parent::beginTransaction();
+            parent::beginTransaction();
+
+            return true;
         }
 
         $span = $this->startSpan('BEGIN');
 
         try {
-            $result = parent::beginTransaction();
+            parent::beginTransaction();
         } catch (\Throwable $e) {
             $span->recordException($e);
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
@@ -108,19 +110,21 @@ final class TraceableConnectionDbal3 extends AbstractConnectionMiddleware
             $span->end();
         }
 
-        return $result;
+        return true;
     }
 
     public function commit(): bool
     {
         if (!$this->isEnabled()) {
-            return parent::commit();
+            parent::commit();
+
+            return true;
         }
 
         $span = $this->startSpan('COMMIT');
 
         try {
-            $result = parent::commit();
+            parent::commit();
         } catch (\Throwable $e) {
             $span->recordException($e);
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
@@ -130,19 +134,21 @@ final class TraceableConnectionDbal3 extends AbstractConnectionMiddleware
             $span->end();
         }
 
-        return $result;
+        return true;
     }
 
     public function rollBack(): bool
     {
         if (!$this->isEnabled()) {
-            return parent::rollBack();
+            parent::rollBack();
+
+            return true;
         }
 
         $span = $this->startSpan('ROLLBACK');
 
         try {
-            $result = parent::rollBack();
+            parent::rollBack();
         } catch (\Throwable $e) {
             $span->recordException($e);
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
@@ -152,7 +158,7 @@ final class TraceableConnectionDbal3 extends AbstractConnectionMiddleware
             $span->end();
         }
 
-        return $result;
+        return true;
     }
 
     private function isEnabled(): bool
