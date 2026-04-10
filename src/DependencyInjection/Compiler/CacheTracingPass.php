@@ -8,14 +8,17 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Contracts\Cache\NamespacedPoolInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Traceway\OpenTelemetryBundle\Cache\TraceableCachePool;
+use Traceway\OpenTelemetryBundle\Cache\TraceableNamespacedCachePool;
 use Traceway\OpenTelemetryBundle\Cache\TraceableTagAwareCachePool;
 
 /**
  * Decorates all services tagged with 'cache.pool' with our tracing wrapper.
  *
- * Tag-aware pools get {@see TraceableTagAwareCachePool}; others get
+ * Tag-aware pools get {@see TraceableTagAwareCachePool}, namespaced pools
+ * (Symfony 7.3+) get {@see TraceableNamespacedCachePool}, and others get
  * {@see TraceableCachePool}. Decoration priority -32 ensures we wrap
  * after Symfony's own TraceableAdapter (profiler) at -16.
  */
@@ -52,8 +55,18 @@ final class CacheTracingPass implements CompilerPassInterface
             $class = $definition->getClass();
 
             $isTagAware = null !== $class && is_subclass_of($class, TagAwareCacheInterface::class);
+            $isNamespaced = !$isTagAware
+                && interface_exists(NamespacedPoolInterface::class)
+                && null !== $class
+                && is_subclass_of($class, NamespacedPoolInterface::class);
 
-            $decoratorClass = $isTagAware ? TraceableTagAwareCachePool::class : TraceableCachePool::class;
+            if ($isTagAware) {
+                $decoratorClass = TraceableTagAwareCachePool::class;
+            } elseif ($isNamespaced) {
+                $decoratorClass = TraceableNamespacedCachePool::class;
+            } else {
+                $decoratorClass = TraceableCachePool::class;
+            }
             $decoratorId = $id . '.otel';
             $innerId = $decoratorId . '.inner';
 
