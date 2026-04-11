@@ -16,8 +16,10 @@ use Doctrine\DBAL\Driver\Middleware as DoctrineMiddleware;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\TraceableMiddleware as DoctrineTraceableMiddleware;
 use Traceway\OpenTelemetryBundle\EventSubscriber\ConsoleSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
+use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMiddleware;
 use Traceway\OpenTelemetryBundle\Tracing;
+use Traceway\OpenTelemetryBundle\Monolog\OtelLogHandler;
 use Traceway\OpenTelemetryBundle\Monolog\TraceContextProcessor;
 use Traceway\OpenTelemetryBundle\Twig\OpenTelemetryTwigExtension;
 
@@ -25,28 +27,39 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
 {
     public function prepend(ContainerBuilder $container): void
     {
-        if (!$this->isMessengerAvailable()) {
-            return;
-        }
-
         $configs = $container->getExtensionConfig($this->getAlias());
         $config = $this->processConfiguration(new Configuration(), $configs);
 
-        if (!$config['messenger_enabled']) {
-            return;
-        }
-
-        $container->prependExtensionConfig('framework', [
-            'messenger' => [
-                'buses' => [
-                    'messenger.bus.default' => [
-                        'middleware' => [
-                            OpenTelemetryMiddleware::class,
+        if ($config['messenger_enabled'] && $this->isMessengerAvailable()) {
+            $container->prependExtensionConfig('framework', [
+                'messenger' => [
+                    'buses' => [
+                        'messenger.bus.default' => [
+                            'middleware' => [
+                                OpenTelemetryMiddleware::class,
+                            ],
                         ],
                     ],
                 ],
-            ],
-        ]);
+            ]);
+        }
+
+        if ($config['log_export_enabled']) {
+            if (!$container->hasExtension('monolog')) {
+                throw new \LogicException(
+                    'The "open_telemetry.log_export_enabled" option requires symfony/monolog-bundle to be installed and enabled. Run "composer require symfony/monolog-bundle" or set "log_export_enabled: false".'
+                );
+            }
+
+            $container->prependExtensionConfig('monolog', [
+                'handlers' => [
+                    'opentelemetry' => [
+                        'type' => 'service',
+                        'id' => OtelLogHandler::class,
+                    ],
+                ],
+            ]);
+        }
     }
 
     public function load(array $configs, ContainerBuilder $container): void
@@ -124,6 +137,17 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $monologDef = new Definition(TraceContextProcessor::class);
             $monologDef->addTag('monolog.processor');
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
+        }
+
+        if ($config['log_export_enabled'] && $container->hasExtension('monolog')) {
+            $handlerDef = new Definition(OtelLogHandler::class);
+            $handlerDef->setArgument('$level', $config['log_export_level']);
+            $handlerDef->setAutoconfigured(true);
+            $container->setDefinition(OtelLogHandler::class, $handlerDef);
+
+            $flushDef = new Definition(OtelLoggerFlushSubscriber::class);
+            $flushDef->setAutoconfigured(true);
+            $container->setDefinition(OtelLoggerFlushSubscriber::class, $flushDef);
         }
     }
 

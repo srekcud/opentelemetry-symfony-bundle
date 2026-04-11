@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Monolog log export via OpenTelemetry Logs API** — new `OtelLogHandler` bridges Monolog records into the OTel Logs API with native trace correlation, per-channel instrumentation scopes, microsecond timestamp precision, and exception attributes. Off by default; enable with `log_export_enabled: true` (also requires `symfony/monolog-bundle`)
+- **`log_export_enabled` / `log_export_level` config keys** — opt-in toggle and minimum severity filter for the new OTel log export pipeline
+- **`OtelLoggerFlushSubscriber`** — flushes the `LoggerProvider` on `kernel.terminate` and `console.terminate` so log records queued in `BatchLogRecordProcessor` are not lost when a request finishes faster than the batch processor's scheduled flush interval
+- **Re-entrance guard in `OtelLogHandler`** — prevents infinite loops when the OTel exporter itself emits a log record (e.g. an instrumented HTTP client logging a failed OTLP send), matching `TraceableHttpClient`'s `$inFlight` pattern
+- **Loud failure when `log_export_enabled: true` but `symfony/monolog-bundle` is missing** — `OpenTelemetryExtension::prepend()` now throws `LogicException` with a clear install hint instead of silently no-op'ing (the previous behavior masked the misconfiguration because `prependExtensionConfig` stores config for nonexistent extensions without error)
+
 ## [1.5.0] - 2026-04-10
 
 ### Added

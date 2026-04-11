@@ -8,7 +8,7 @@
 [![Symfony Version](https://img.shields.io/badge/symfony-%3E%3D6.4-000000.svg)](https://symfony.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation. No C extension required.
+Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation and OpenTelemetry log export. No C extension required.
 
 Works with any OpenTelemetry-compatible backend: [Traceway](https://tracewayapp.com), [Jaeger](https://www.jaegertracing.io/), [Zipkin](https://zipkin.io/), [Datadog](https://www.datadoghq.com/), [Grafana Tempo](https://grafana.com/oss/tempo/), [Honeycomb](https://www.honeycomb.io/), and more.
 
@@ -47,7 +47,8 @@ That's it — every HTTP request, console command, outgoing HTTP call, Messenger
 | **Doctrine DBAL** | CLIENT | SQL queries (parameterized), transactions, db system/namespace auto-detection. Requires `doctrine/dbal` ^3.6 or ^4.0 |
 | **Cache** | INTERNAL | `get` (hit/miss), `delete`, `invalidateTags` with pool name. Requires `symfony/cache` |
 | **Twig** | INTERNAL | Template name, nested includes. Requires `twig/twig` |
-| **Monolog** | — | Injects `trace_id` + `span_id` into every log record. Requires `monolog/monolog` |
+| **Monolog: log correlation** | — | Inject `trace_id` + `span_id` into every log record. Requires `monolog/monolog` |
+| **Monolog: log export** | — | Export log records via the OTel Logs API with native trace correlation and per-channel instrumentation scope. Requires `symfony/monolog-bundle`. **Off by default** |
 
 Additional: response propagation (Server-Timing headers), `Tracing` helper for manual spans, full [OTel semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/).
 
@@ -87,7 +88,10 @@ open_telemetry:
     twig_enabled: true
     twig_excluded_templates: ['@WebProfiler/', '@Debug/']
 
-    monolog_enabled: true
+    monolog_enabled: true            # inject trace_id/span_id into log records
+
+    log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
+    log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
 ```
 
 ### Environment Variables
@@ -96,7 +100,8 @@ open_telemetry:
 |---|---|---|
 | `OTEL_PHP_AUTOLOAD_ENABLED` | `true` | Enable SDK auto-initialization |
 | `OTEL_SERVICE_NAME` | `my-symfony-app` | Service name shown in your backend |
-| `OTEL_TRACES_EXPORTER` | `otlp` | Exporter type (`otlp`, `zipkin`, `console`, `none`) |
+| `OTEL_TRACES_EXPORTER` | `otlp` | Traces exporter (`otlp`, `zipkin`, `console`, `none`) |
+| `OTEL_LOGS_EXPORTER` | `otlp` | Logs exporter (`otlp`, `console`, `none`) — only used when `log_export_enabled: true` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector/backend endpoint |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/json` | Protocol (`http/json`, `http/protobuf`, `grpc`) |
 
