@@ -293,6 +293,19 @@ final class OpenTelemetryExtensionTest extends TestCase
         self::assertFalse($container->hasDefinition(TraceContextProcessor::class));
     }
 
+    public function testLogExportEnabledThrowsWhenMonologBundleMissing(): void
+    {
+        $container = new ContainerBuilder();
+        $extension = new OpenTelemetryExtension();
+        $container->registerExtension($extension);
+        $container->loadFromExtension('open_telemetry', ['log_export_enabled' => true]);
+
+        self::expectException(\LogicException::class);
+        self::expectExceptionMessage('symfony/monolog-bundle');
+
+        $extension->prepend($container);
+    }
+
     private function buildContainer(array $config): ContainerBuilder
     {
         $container = new ContainerBuilder();

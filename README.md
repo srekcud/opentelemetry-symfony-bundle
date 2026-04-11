@@ -8,9 +8,13 @@
 [![Symfony Version](https://img.shields.io/badge/symfony-%3E%3D6.4-000000.svg)](https://symfony.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation. No C extension required.
+Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation and OpenTelemetry log export. No C extension required.
 
 Works with any OpenTelemetry-compatible backend: [Traceway](https://tracewayapp.com), [Jaeger](https://www.jaegertracing.io/), [Zipkin](https://zipkin.io/), [Datadog](https://www.datadoghq.com/), [Grafana Tempo](https://grafana.com/oss/tempo/), [Honeycomb](https://www.honeycomb.io/), and more.
+
+- **Pure PHP** — no C extension required; installs on every managed Symfony host
+- **Production-ready** — stable since v1.0, PHPStan level 10 with no baseline, supports Symfony 6.4 LTS through 8.x
+- **Correct under load** — Messenger trace context propagates across async queue boundaries, Doctrine DBAL 3 and 4 both CI-tested, re-entrance guards prevent export-path recursion in HttpClient and the log handler
 
 ## Quick Start
 
@@ -24,17 +28,12 @@ OTEL_SERVICE_NAME=my-symfony-app
 OTEL_TRACES_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+# Optional: OTEL_RESOURCE_ATTRIBUTES=service.version=1.0
 ```
 
-> Use `http/json` by default. Switch to `http/protobuf` only if you have `ext-protobuf` installed — see [Performance](#performance).
+> Use `http/json` unless you have `ext-protobuf` installed — see [Performance](#performance).
 
-Optionally, it is possible to also provide a version identifier using e.g.:
-
-```env
-OTEL_RESOURCE_ATTRIBUTES=service.version=1.0
-```
-
-That's it — every HTTP request, console command, outgoing HTTP call, Messenger job, DB query, cache operation, and Twig render is now traced automatically.
+That's it. Every HTTP request, console command, outgoing call, Messenger job, DB query, cache operation, and Twig render is now traced.
 
 ## What Gets Traced
 
@@ -44,10 +43,11 @@ That's it — every HTTP request, console command, outgoing HTTP call, Messenger
 | **Console commands** | SERVER | Command name, arguments, exit code, exceptions |
 | **HttpClient** | CLIENT | Outgoing requests with W3C context propagation, OTLP endpoint auto-excluded, re-entrance guard |
 | **Messenger** | PRODUCER/CONSUMER | Message class, transport, W3C context propagation across async boundaries |
-| **Doctrine DBAL** | CLIENT | SQL queries (parameterized), transactions, db system/namespace auto-detection. Requires `doctrine/dbal` ^3.6 or ^4.0 |
+| **Doctrine DBAL** | CLIENT | SQL queries (parameterized), transactions, db system/namespace auto-detection. **DBAL 3.6+ and 4.x both CI-tested** |
 | **Cache** | INTERNAL | `get` (hit/miss), `delete`, `invalidateTags` with pool name. Requires `symfony/cache` |
 | **Twig** | INTERNAL | Template name, nested includes. Requires `twig/twig` |
-| **Monolog** | — | Injects `trace_id` + `span_id` into every log record. Requires `monolog/monolog` |
+| **Monolog: log correlation** | — | Inject `trace_id` + `span_id` into every log record. Requires `monolog/monolog` |
+| **Monolog: log export** | — | Export log records via the OTel Logs API with native trace correlation and per-channel instrumentation scope. Requires `symfony/monolog-bundle`. **Off by default** |
 
 Additional: response propagation (Server-Timing headers), `Tracing` helper for manual spans, full [OTel semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/).
 
@@ -87,7 +87,10 @@ open_telemetry:
     twig_enabled: true
     twig_excluded_templates: ['@WebProfiler/', '@Debug/']
 
-    monolog_enabled: true
+    monolog_enabled: true            # inject trace_id/span_id into log records
+
+    log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
+    log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
 ```
 
 ### Environment Variables
@@ -96,7 +99,8 @@ open_telemetry:
 |---|---|---|
 | `OTEL_PHP_AUTOLOAD_ENABLED` | `true` | Enable SDK auto-initialization |
 | `OTEL_SERVICE_NAME` | `my-symfony-app` | Service name shown in your backend |
-| `OTEL_TRACES_EXPORTER` | `otlp` | Exporter type (`otlp`, `zipkin`, `console`, `none`) |
+| `OTEL_TRACES_EXPORTER` | `otlp` | Traces exporter (`otlp`, `zipkin`, `console`, `none`) |
+| `OTEL_LOGS_EXPORTER` | `otlp` | Logs exporter (`otlp`, `console`, `none`) — only used when `log_export_enabled: true` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector/backend endpoint |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/json` | Protocol (`http/json`, `http/protobuf`, `grpc`) |
 
@@ -127,34 +131,15 @@ class OrderService
 }
 ```
 
-Mock in tests:
-
-```php
-$tracing = $this->createStub(TracingInterface::class);
-$tracing->method('trace')->willReturnCallback(fn ($name, $cb) => $cb());
-```
+Mock in tests with `$this->createStub(TracingInterface::class)` and have `trace()` invoke the callback directly.
 
 ## Performance
 
-The bundle adds **near-zero overhead** when the SDK is not active — every component checks `isEnabled()` and short-circuits immediately.
+Near-zero overhead when the SDK is inactive — every component short-circuits via `isEnabled()`. When tracing is on, almost all cost is in span export, not instrumentation. PHP-FPM has no background thread, so `BatchSpanProcessor` flushes during request shutdown.
 
-When tracing is active, most overhead comes from the SDK's span export, not instrumentation. PHP-FPM has no background thread, so `BatchSpanProcessor` flushes during request shutdown.
+**Use `http/json` unless you have `ext-protobuf` installed.** PHP's native `json_encode()` is faster than the pure-PHP protobuf encoder, which adds significant CPU overhead under load. Switch to `http/protobuf` only with the C extension installed.
 
-### Export Protocol
-
-| Setup | Recommendation |
-|---|---|
-| `ext-protobuf` **installed** | Use `http/protobuf` — smallest payloads, fastest serialization |
-| `ext-protobuf` **not installed** | Use `http/json` — `json_encode()` is native C in PHP, much faster than pure-PHP protobuf |
-
-> **Do not** use `http/protobuf` without `ext-protobuf`. The pure-PHP protobuf encoder adds significant CPU overhead under load.
-
-### Tips
-
-1. **Local OTel Collector** — export to `localhost:4318` (sub-ms latency), let the Collector forward asynchronously
-2. **Sampling** — `OTEL_TRACES_SAMPLER=parentbased_traceidratio` + `OTEL_TRACES_SAMPLER_ARG=0.1` traces 10% of requests
-3. **Install `ext-protobuf`** — if using `http/protobuf`, the C extension reduces serialization overhead dramatically ([pecl.php.net/protobuf](https://pecl.php.net/package/protobuf))
-4. **Exclude noisy paths** — use `excluded_paths` and `cache_excluded_pools` to reduce span volume
+For high-traffic apps: run a local OTel Collector at `localhost:4318` (sub-ms latency) and let it forward asynchronously, enable head sampling with `OTEL_TRACES_SAMPLER=parentbased_traceidratio` + `OTEL_TRACES_SAMPLER_ARG=0.1`, and use `excluded_paths` / `cache_excluded_pools` to drop noisy spans.
 
 ## Contributing
 

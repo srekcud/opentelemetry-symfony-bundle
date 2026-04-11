@@ -108,6 +108,18 @@ final class Configuration implements ConfigurationInterface
                     ->info('Inject trace_id and span_id into Monolog log records for log-trace correlation.')
                     ->defaultTrue()
                 ->end()
+                ->booleanNode('log_export_enabled')
+                    ->info('Export Monolog logs via OpenTelemetry (OTLP). Requires a configured OTel LoggerProvider (e.g. via OTEL_LOGS_EXPORTER env var).')
+                    ->defaultFalse()
+                ->end()
+                ->scalarNode('log_export_level')
+                    ->info('Minimum Monolog level to export via OTel (debug, info, notice, warning, error, critical, alert, emergency).')
+                    ->defaultValue('debug')
+                    ->validate()
+                        ->ifNotInArray(['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'])
+                        ->thenInvalid('Invalid log level %s')
+                    ->end()
+                ->end()
             ->end()
         ;
 
