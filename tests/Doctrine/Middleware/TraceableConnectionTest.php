@@ -64,7 +64,7 @@ final class TraceableConnectionTest extends TestCase
 
         $spans = $this->exporter->getSpans();
         self::assertCount(1, $spans);
-        self::assertSame('INSERT app_db', $spans[0]->getName());
+        self::assertSame('INSERT users', $spans[0]->getName());
         self::assertSame(SpanKind::KIND_CLIENT, $spans[0]->getKind());
 
         $attributes = $spans[0]->getAttributes()->toArray();
@@ -72,6 +72,7 @@ final class TraceableConnectionTest extends TestCase
         self::assertSame('mysql', $attributes['db.system']);
         self::assertSame('INSERT', $attributes['db.operation.name']);
         self::assertSame('INSERT', $attributes['db.operation']);
+        self::assertSame('users', $attributes['db.collection.name']);
         self::assertSame('app_db', $attributes['db.namespace']);
         self::assertSame('app_db', $attributes['db.name']);
         self::assertSame('localhost', $attributes['server.address']);
@@ -88,7 +89,7 @@ final class TraceableConnectionTest extends TestCase
         $connection->exec('INSERT INTO users (name) VALUES ("test")');
 
         $span = $this->exporter->getSpans()[0];
-        self::assertSame('INSERT app_db', $span->getName());
+        self::assertSame('INSERT users', $span->getName());
         $attr = $span->getAttributes()->toArray();
         self::assertSame('INSERT INTO users (name) VALUES ("test")', $attr['db.query.text']);
         self::assertSame('INSERT INTO users (name) VALUES ("test")', $attr['db.statement']);
@@ -105,7 +106,7 @@ final class TraceableConnectionTest extends TestCase
 
         $spans = $this->exporter->getSpans();
         self::assertCount(1, $spans);
-        self::assertSame('SELECT app_db', $spans[0]->getName());
+        self::assertSame('SELECT users', $spans[0]->getName());
         self::assertSame(SpanKind::KIND_CLIENT, $spans[0]->getKind());
         self::assertArrayNotHasKey('db.query.text', $spans[0]->getAttributes()->toArray());
         self::assertArrayNotHasKey('db.statement', $spans[0]->getAttributes()->toArray());
@@ -120,7 +121,7 @@ final class TraceableConnectionTest extends TestCase
         $connection->query('SELECT * FROM users WHERE id = 1');
 
         $span = $this->exporter->getSpans()[0];
-        self::assertSame('SELECT app_db', $span->getName());
+        self::assertSame('SELECT users', $span->getName());
         $attr = $span->getAttributes()->toArray();
         self::assertSame('SELECT * FROM users WHERE id = 1', $attr['db.query.text']);
         self::assertSame('SELECT * FROM users WHERE id = 1', $attr['db.statement']);
@@ -150,6 +151,7 @@ final class TraceableConnectionTest extends TestCase
         self::assertCount(1, $spans);
         self::assertSame(StatusCode::STATUS_ERROR, $spans[0]->getStatus()->getCode());
         self::assertSame('Connection lost', $spans[0]->getStatus()->getDescription());
+        self::assertSame(\RuntimeException::class, $spans[0]->getAttributes()->toArray()['error.type']);
 
         $events = $spans[0]->getEvents();
         self::assertNotEmpty($events);
@@ -167,7 +169,7 @@ final class TraceableConnectionTest extends TestCase
         }
 
         $span = $this->exporter->getSpans()[0];
-        self::assertSame('SELECT app_db', $span->getName());
+        self::assertSame('SELECT slow_table', $span->getName());
         self::assertArrayNotHasKey('db.query.text', $span->getAttributes()->toArray());
         self::assertArrayNotHasKey('db.statement', $span->getAttributes()->toArray());
     }
@@ -184,7 +186,7 @@ final class TraceableConnectionTest extends TestCase
         }
 
         $span = $this->exporter->getSpans()[0];
-        self::assertSame('SELECT app_db', $span->getName());
+        self::assertSame('SELECT slow_table', $span->getName());
         $attr = $span->getAttributes()->toArray();
         self::assertSame('SELECT * FROM slow_table', $attr['db.query.text']);
         self::assertSame('SELECT * FROM slow_table', $attr['db.statement']);
@@ -273,7 +275,7 @@ final class TraceableConnectionTest extends TestCase
         $connection->exec($longSql);
 
         $spans = $this->exporter->getSpans();
-        self::assertSame('SELECT app_db', $spans[0]->getName());
+        self::assertSame('SELECT very_long_table_name', $spans[0]->getName());
         self::assertSame($longSql, $spans[0]->getAttributes()->toArray()['db.query.text']);
     }
 
