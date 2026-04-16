@@ -147,7 +147,6 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $monologDef->addTag('monolog.processor');
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
         }
-
     }
 
     private function isConsoleAvailable(): bool
