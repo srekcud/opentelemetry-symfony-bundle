@@ -18,6 +18,8 @@ use Traceway\OpenTelemetryBundle\EventSubscriber\ConsoleSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMiddleware;
+use Traceway\OpenTelemetryBundle\Metrics\MeterRegistry;
+use Traceway\OpenTelemetryBundle\Metrics\MeterRegistryInterface;
 use Traceway\OpenTelemetryBundle\Tracing;
 use Traceway\OpenTelemetryBundle\Monolog\OtelLogHandler;
 use Traceway\OpenTelemetryBundle\Monolog\TraceContextProcessor;
@@ -146,6 +148,18 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $monologDef = new Definition(TraceContextProcessor::class);
             $monologDef->addTag('monolog.processor');
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
+        }
+
+        /** @var array{enabled: bool, meter_name: string} $metrics */
+        $metrics = $config['metrics'];
+        $meterName = $metrics['meter_name'];
+
+        if ($metrics['enabled']) {
+            $container->getDefinition(MeterRegistry::class)
+                ->setArgument('$meterName', $meterName);
+        } else {
+            $container->removeDefinition(MeterRegistry::class);
+            $container->removeAlias(MeterRegistryInterface::class);
         }
     }
 
