@@ -19,3 +19,6 @@ services:
 
     Traceway\OpenTelemetryBundle\Metrics\MeterRegistryInterface:
         alias: Traceway\OpenTelemetryBundle\Metrics\MeterRegistry
+
+    Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware:
+        autoconfigure: true
