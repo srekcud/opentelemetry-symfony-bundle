@@ -105,6 +105,9 @@ open_telemetry:
             excluded_queues: []
         doctrine:
             enabled: false             # emit db.client.operation.duration for every DBAL query/exec/transaction
+        http_server:
+            enabled: false             # emit http.server.request.duration / active_requests / body sizes
+            excluded_paths: []         # same path-prefix rules as the tracing excluded_paths
 ```
 
 ### Environment Variables
@@ -170,10 +173,27 @@ open_telemetry:
 | `messaging.process.duration` | Histogram | `s` | Messenger consume | `messaging.system`, `messaging.operation.name`, `messaging.operation.type`, `messaging.destination.name`, `error.type` on failure |
 | `messaging.client.consumed.messages` | Counter | `{message}` | Messenger consume | Same as above |
 | `db.client.operation.duration` | Histogram | `s` | DBAL connection | `db.system.name`, `db.namespace`, `server.address`, `server.port`, `db.operation.name`, `db.collection.name` (when extractable), `error.type` on failure |
+| `http.server.request.duration` | Histogram | `s` | HTTP server | `http.request.method`, `url.scheme`, `http.route` if matched, `http.response.status_code`, `server.address`, `server.port`, `error.type` on failure |
+| `http.server.active_requests` | UpDownCounter | `{request}` | HTTP server | `http.request.method`, `url.scheme`, `server.address`, `server.port` |
+| `http.server.request.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
+| `http.server.response.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
 
-Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development) and [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable). The general `error.type` attribute is Stable. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
+Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development), [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable), and [HTTP metrics](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/) (`http.server.request.duration` is Stable; the others are Development). The general `error.type` attribute is Stable. Only main HTTP requests are measured; sub-requests are already covered by the main request duration. `http_server.excluded_paths` uses the same prefix-match rules as the tracing `excluded_paths`. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
 
-`messenger.excluded_queues` is matched on `ReceivedStamp::getTransportName()` (consume path only). Dispatch-side exclusion and dispatch metrics (`messaging.client.sent.messages`, `messaging.client.operation.duration`) are out of scope for this first metrics drop.
+`messenger.excluded_queues` is matched on `ReceivedStamp::getTransportName()` (consume path only). Dispatch-side metrics (`messaging.client.sent.messages`, `messaging.client.operation.duration`) are out of scope for this first drop.
+
+**HTTP Server** (incoming requests):
+
+| Instrument | Kind | Unit | Stability | Attributes |
+|---|---|---|---|---|
+| `http.server.request.duration` | Histogram | `s` | **Stable** | `http.request.method`, `url.scheme`, `http.route` if matched, `http.response.status_code`, `server.address`, `server.port`, `error.type` on failure |
+| `http.server.active_requests` | UpDownCounter | `{request}` | Development | `http.request.method`, `url.scheme`, `server.address`, `server.port` |
+| `http.server.request.body.size` | Histogram | `By` | Development | Same as duration (emitted when `Content-Length` is set) |
+| `http.server.response.body.size` | Histogram | `By` | Development | Same as duration (emitted when `Content-Length` is set) |
+
+Names follow the [OTel HTTP metrics semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/). Only main requests are measured; sub-requests are already covered by the main request duration. `http_server.excluded_paths` uses the same prefix-match rules as the tracing `excluded_paths`.
+
+Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
 
 The DBAL instrumentation wraps every connection produced by Doctrine. It records duration for `Connection::query()`, `Connection::exec()`, prepared `Statement::execute()`, and the transaction control methods (`beginTransaction`, `commit`, `rollBack`). The SQL text itself is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when it can be extracted unambiguously (`db.collection.name`).
 
