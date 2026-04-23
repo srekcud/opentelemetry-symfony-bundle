@@ -58,7 +58,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $duration = $metrics['http.server.request.duration'];
         self::assertSame('s', $duration->unit);
 
-        $durationPoints = iterator_to_array($duration->data->dataPoints);
+        $durationPoints = [...$duration->data->dataPoints];
         self::assertCount(1, $durationPoints);
         self::assertSame(1, $durationPoints[0]->count);
 
@@ -69,7 +69,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         self::assertArrayNotHasKey('error.type', $attr);
 
         self::assertArrayHasKey('http.server.active_requests', $metrics);
-        $active = iterator_to_array($metrics['http.server.active_requests']->data->dataPoints);
+        $active = [...$metrics['http.server.active_requests']->data->dataPoints];
         self::assertSame(0, array_sum(array_map(static fn ($p): int|float => $p->value, $active)));
     }
 
@@ -85,7 +85,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
 
         $metrics = $this->collectMetrics();
-        $points = iterator_to_array($metrics['http.server.request.duration']->data->dataPoints);
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
         self::assertSame('/api/items/{id}', $points[0]->attributes->toArray()['http.route']);
     }
 
@@ -101,7 +101,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
 
         $metrics = $this->collectMetrics();
-        $points = iterator_to_array($metrics['http.server.request.duration']->data->dataPoints);
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
         self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
     }
 
@@ -145,11 +145,11 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $metrics = $this->collectMetrics();
 
         self::assertArrayHasKey('http.server.request.body.size', $metrics);
-        $reqPts = iterator_to_array($metrics['http.server.request.body.size']->data->dataPoints);
+        $reqPts = [...$metrics['http.server.request.body.size']->data->dataPoints];
         self::assertSame(1024, $reqPts[0]->sum);
 
         self::assertArrayHasKey('http.server.response.body.size', $metrics);
-        $resPts = iterator_to_array($metrics['http.server.response.body.size']->data->dataPoints);
+        $resPts = [...$metrics['http.server.response.body.size']->data->dataPoints];
         self::assertSame(5, $resPts[0]->sum);
     }
 
@@ -211,7 +211,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
 
         $metrics = $this->collectMetrics();
         self::assertArrayHasKey('http.server.request.duration', $metrics);
-        $points = iterator_to_array($metrics['http.server.request.duration']->data->dataPoints);
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
         self::assertSame(2, $points[0]->count);
     }
 }
