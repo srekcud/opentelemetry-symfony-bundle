@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Traceway\OpenTelemetryBundle\Tests\Messenger;
 
+use OpenTelemetry\API\Metrics\CounterInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
@@ -197,5 +198,53 @@ final class OpenTelemetryMetricsMiddlewareTest extends TestCase
             OpenTelemetryMetricsMiddleware::DURATION_BUCKET_BOUNDARIES,
             $points[0]->explicitBounds,
         );
+    }
+
+    public function testRecordFailureDoesNotMaskHandlerException(): void
+    {
+        $middleware = new OpenTelemetryMetricsMiddleware('test');
+        $this->injectBrokenCounter($middleware);
+
+        $envelope = new Envelope(new \stdClass(), [new ReceivedStamp('async')]);
+        $businessException = new \DomainException('handler failed');
+
+        $failing = new class($businessException) implements MiddlewareInterface {
+            public function __construct(private readonly \Throwable $e) {}
+
+            public function handle(Envelope $envelope, StackInterface $stack): Envelope
+            {
+                throw $this->e;
+            }
+        };
+
+        try {
+            $middleware->handle($envelope, new StackMiddleware([$middleware, $failing]));
+            self::fail('Expected DomainException');
+        } catch (\DomainException $caught) {
+            self::assertSame($businessException, $caught);
+        }
+    }
+
+    public function testRecordFailureOnSuccessPathIsSwallowed(): void
+    {
+        $middleware = new OpenTelemetryMetricsMiddleware('test');
+        $this->injectBrokenCounter($middleware);
+
+        $envelope = new Envelope(new \stdClass(), [new ReceivedStamp('async')]);
+
+        $result = $middleware->handle($envelope, new StackMiddleware());
+
+        self::assertSame($envelope, $result);
+    }
+
+    private function injectBrokenCounter(OpenTelemetryMetricsMiddleware $middleware): void
+    {
+        $brokenCounter = $this->createMock(CounterInterface::class);
+        $brokenCounter->method('add')->willThrowException(new \RuntimeException('metrics down'));
+
+        $reflection = new \ReflectionClass($middleware);
+        $messages = $reflection->getProperty('messages');
+        $messages->setAccessible(true);
+        $messages->setValue($middleware, $brokenCounter);
     }
 }

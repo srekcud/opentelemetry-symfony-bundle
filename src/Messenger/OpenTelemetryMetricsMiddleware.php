@@ -75,16 +75,19 @@ final class OpenTelemetryMetricsMiddleware implements MiddlewareInterface, Reset
         }
 
         $start = hrtime(true);
+        $exception = null;
 
         try {
-            $envelope = $stack->next()->handle($envelope, $stack);
-            $this->record($destination, $start, null);
-
-            return $envelope;
+            return $stack->next()->handle($envelope, $stack);
         } catch (\Throwable $e) {
-            $this->record($destination, $start, $e);
+            $exception = $e;
 
             throw $e;
+        } finally {
+            try {
+                $this->record($destination, $start, $exception);
+            } catch (\Throwable) {
+            }
         }
     }
 
