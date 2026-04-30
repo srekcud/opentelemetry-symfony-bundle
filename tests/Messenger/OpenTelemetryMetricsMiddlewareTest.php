@@ -183,4 +183,19 @@ final class OpenTelemetryMetricsMiddlewareTest extends TestCase
         $points = [...$metrics['messaging.client.consumed.messages']->data->dataPoints];
         self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
     }
+
+    public function testDurationHistogramUsesSecondBasedBuckets(): void
+    {
+        $middleware = new OpenTelemetryMetricsMiddleware('test');
+        $envelope = new Envelope(new \stdClass(), [new ReceivedStamp('async')]);
+
+        $middleware->handle($envelope, new StackMiddleware());
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['messaging.process.duration']->data->dataPoints];
+        self::assertSame(
+            OpenTelemetryMetricsMiddleware::DURATION_BUCKET_BOUNDARIES,
+            $points[0]->explicitBounds,
+        );
+    }
 }
