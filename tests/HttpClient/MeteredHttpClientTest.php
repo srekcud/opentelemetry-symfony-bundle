@@ -242,4 +242,43 @@ final class MeteredHttpClientTest extends TestCase
         }
         self::assertSame(2, $total);
     }
+
+    public function testNamespacedTransportFailureUsesFqcn(): void
+    {
+        $mockClient = new MockHttpClient(function () {
+            throw new \Symfony\Component\HttpClient\Exception\TransportException('connection refused');
+        });
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        try {
+            $client->request('GET', 'https://api.example.com/data')->getContent();
+            self::fail('Expected exception');
+        } catch (\Throwable) {
+        }
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.client.request.duration']->data->dataPoints];
+        self::assertSame(
+            \Symfony\Component\HttpClient\Exception\TransportException::class,
+            $points[0]->attributes->toArray()['error.type'],
+        );
+    }
+
+    public function testAnonymousTransportFailureFallsBackToParentClass(): void
+    {
+        $mockClient = new MockHttpClient(function () {
+            throw new class('boom') extends \RuntimeException {};
+        });
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        try {
+            $client->request('GET', 'https://api.example.com/data')->getContent();
+            self::fail('Expected exception');
+        } catch (\Throwable) {
+        }
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.client.request.duration']->data->dataPoints];
+        self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
+    }
 }

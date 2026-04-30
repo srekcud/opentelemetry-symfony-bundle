@@ -166,10 +166,21 @@ final class MeteredHttpClient implements HttpClientInterface, ResetInterface
      */
     public function recordFailure(int|float $start, array $attributes, \Throwable $exception): void
     {
-        $attributes[ErrorAttributes::ERROR_TYPE] = (new \ReflectionClass($exception))->getShortName();
+        $attributes[ErrorAttributes::ERROR_TYPE] = self::resolveErrorType($exception);
 
         $durationSeconds = (hrtime(true) - $start) / 1_000_000_000;
         $this->getDurationHistogram()->record($durationSeconds, $attributes);
+    }
+
+    private static function resolveErrorType(\Throwable $exception): string
+    {
+        $type = $exception::class;
+
+        if (str_contains($type, '@anonymous')) {
+            $type = get_parent_class($exception) ?: \Throwable::class;
+        }
+
+        return $type;
     }
 
     /**
