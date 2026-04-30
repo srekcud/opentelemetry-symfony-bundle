@@ -281,4 +281,19 @@ final class MeteredHttpClientTest extends TestCase
         $points = [...$metrics['http.client.request.duration']->data->dataPoints];
         self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
     }
+
+    public function testDurationHistogramUsesSecondBasedBuckets(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('ok', ['http_code' => 200]));
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        $client->request('GET', 'https://api.example.com/data')->getStatusCode();
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.client.request.duration']->data->dataPoints];
+        self::assertSame(
+            MeteredHttpClient::DURATION_BUCKET_BOUNDARIES,
+            $points[0]->explicitBounds,
+        );
+    }
 }
