@@ -48,6 +48,10 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class OpenTelemetryMetricsSubscriber implements EventSubscriberInterface, ResetInterface
 {
+    public const DURATION_BUCKET_BOUNDARIES = [
+        0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
+    ];
+
     /** @var list<string> */
     private readonly array $excludedPaths;
 
@@ -280,6 +284,7 @@ final class OpenTelemetryMetricsSubscriber implements EventSubscriberInterface, 
             $this->metricName('duration'),
             's',
             'Duration of HTTP server requests',
+            ['ExplicitBucketBoundaries' => self::DURATION_BUCKET_BOUNDARIES],
         );
     }
 

@@ -140,6 +140,23 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
     }
 
+    public function testDurationHistogramUsesSecondBasedBuckets(): void
+    {
+        $request = Request::create('/api/items', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+
+        $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, new Response('', 200)));
+        $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
+        self::assertSame(
+            OpenTelemetryMetricsSubscriber::DURATION_BUCKET_BOUNDARIES,
+            $points[0]->explicitBounds,
+        );
+    }
+
     public function testExcludedPathEmitsNothing(): void
     {
         $subscriber = new OpenTelemetryMetricsSubscriber('test', ['/health']);
