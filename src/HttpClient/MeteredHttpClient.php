@@ -40,6 +40,10 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class MeteredHttpClient implements HttpClientInterface, ResetInterface
 {
+    public const DURATION_BUCKET_BOUNDARIES = [
+        0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
+    ];
+
     private ?MeterInterface $meter = null;
     private ?HistogramInterface $duration = null;
     private ?HistogramInterface $requestBodySize = null;
@@ -274,6 +278,7 @@ final class MeteredHttpClient implements HttpClientInterface, ResetInterface
             $this->metricName('duration'),
             's',
             'Duration of outbound HTTP client requests',
+            ['ExplicitBucketBoundaries' => self::DURATION_BUCKET_BOUNDARIES],
         );
     }
 
