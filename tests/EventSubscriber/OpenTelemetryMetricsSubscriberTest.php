@@ -105,6 +105,41 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
     }
 
+    public function testNamespacedExceptionUsesFqcn(): void
+    {
+        $request = Request::create('/api/error', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+        $exception = new \Symfony\Component\HttpKernel\Exception\BadRequestHttpException('bad');
+
+        $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onException(new ExceptionEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, $exception));
+        $this->subscriber->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, new Response('', 400)));
+        $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
+        self::assertSame(
+            \Symfony\Component\HttpKernel\Exception\BadRequestHttpException::class,
+            $points[0]->attributes->toArray()['error.type'],
+        );
+    }
+
+    public function testAnonymousExceptionFallsBackToParentClass(): void
+    {
+        $request = Request::create('/api/error', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+        $exception = new class('boom') extends \RuntimeException {};
+
+        $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onException(new ExceptionEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, $exception));
+        $this->subscriber->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, new Response('', 500)));
+        $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+
+        $metrics = $this->collectMetrics();
+        $points = [...$metrics['http.server.request.duration']->data->dataPoints];
+        self::assertSame('RuntimeException', $points[0]->attributes->toArray()['error.type']);
+    }
+
     public function testExcludedPathEmitsNothing(): void
     {
         $subscriber = new OpenTelemetryMetricsSubscriber('test', ['/health']);
