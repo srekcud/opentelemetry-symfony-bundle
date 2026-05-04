@@ -360,4 +360,36 @@ final class MeteredHttpClientTest extends TestCase
         $requestBodySize->setAccessible(true);
         $requestBodySize->setValue($client, $broken);
     }
+
+    public function testInFlightReentrantCallSkipsMetrics(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('ok', ['http_code' => 200]));
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        $reflection = new \ReflectionClass($client);
+        $inFlight = $reflection->getProperty('inFlight');
+        $inFlight->setAccessible(true);
+        $inFlight->setValue($client, true);
+
+        $response = $client->request('GET', 'https://api.example.com/data');
+        $response->getStatusCode();
+
+        self::assertNotInstanceOf(MeteredResponse::class, $response);
+        self::assertSame([], $this->collectMetrics());
+    }
+
+    public function testResetClearsInFlightFlag(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('ok', ['http_code' => 200]));
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        $reflection = new \ReflectionClass($client);
+        $inFlight = $reflection->getProperty('inFlight');
+        $inFlight->setAccessible(true);
+        $inFlight->setValue($client, true);
+
+        $client->reset();
+
+        self::assertFalse($inFlight->getValue($client));
+    }
 }
