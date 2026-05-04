@@ -178,8 +178,25 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $kernel = $this->createStub(HttpKernelInterface::class);
 
         $this->subscriber->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::SUB_REQUEST));
+        $this->subscriber->onRoute(new RequestEvent($kernel, $request, HttpKernelInterface::SUB_REQUEST));
+        $this->subscriber->onException(new ExceptionEvent($kernel, $request, HttpKernelInterface::SUB_REQUEST, new \RuntimeException('boom')));
         $this->subscriber->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::SUB_REQUEST, new Response()));
         $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::SUB_REQUEST));
+
+        self::assertSame([], $this->collectMetrics());
+    }
+
+    public function testEventsForUntrackedRequestAreNoOps(): void
+    {
+        $request = Request::create('/api/items', 'GET');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+
+        // No onRequest call beforehand: the subscriber has no state for this request
+        // (e.g. excluded path scenario, or middleware ordering edge case).
+        $this->subscriber->onRoute(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        $this->subscriber->onException(new ExceptionEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, new \RuntimeException('boom')));
+        $this->subscriber->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, new Response()));
+        $this->subscriber->onFinishRequest(new FinishRequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
 
         self::assertSame([], $this->collectMetrics());
     }
