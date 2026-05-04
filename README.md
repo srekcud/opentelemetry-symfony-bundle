@@ -169,11 +169,13 @@ open_telemetry:
 |---|---|---|---|---|
 | `messaging.process.duration` | Histogram | `s` | Messenger consume | `messaging.system`, `messaging.operation.name`, `messaging.operation.type`, `messaging.destination.name`, `error.type` on failure |
 | `messaging.client.consumed.messages` | Counter | `{message}` | Messenger consume | Same as above |
+| `messaging.client.operation.duration` | Histogram | `s` | Messenger dispatch | Same shape, `messaging.operation.{name,type}` = `send`, destination derived from `SentStamp::getSenderAlias()` (falls back to sender FQCN) |
+| `messaging.client.sent.messages` | Counter | `{message}` | Messenger dispatch | Same as above |
 | `db.client.operation.duration` | Histogram | `s` | DBAL connection | `db.system.name`, `db.namespace`, `server.address`, `server.port`, `db.operation.name`, `db.collection.name` (when extractable), `error.type` on failure |
 
 Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development) and [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable). The general `error.type` attribute is Stable. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
 
-`messenger.excluded_queues` is matched on `ReceivedStamp::getTransportName()` (consume path only). Dispatch-side exclusion and dispatch metrics (`messaging.client.sent.messages`, `messaging.client.operation.duration`) are out of scope for this first metrics drop.
+`messenger.excluded_queues` matches the transport name on both sides — `ReceivedStamp::getTransportName()` on the consume path and `SentStamp::getSenderAlias()` on the dispatch path. A dispatched envelope landing on multiple transports emits one metric point per non-excluded transport.
 
 The DBAL instrumentation wraps every connection produced by Doctrine. It records duration for `Connection::query()`, `Connection::exec()`, prepared `Statement::execute()`, and the transaction control methods (`beginTransaction`, `commit`, `rollBack`). The SQL text itself is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when it can be extracted unambiguously (`db.collection.name`).
 
