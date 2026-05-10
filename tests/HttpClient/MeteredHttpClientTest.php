@@ -214,13 +214,37 @@ final class MeteredHttpClientTest extends TestCase
         $r2 = $client->request('GET', 'https://api.example.com/b');
 
         $chunks = 0;
+        $yielded = [];
         foreach ($client->stream([$r1, $r2]) as $response => $chunk) {
+            $yielded[] = $response;
             if ($chunk->isLast()) {
                 $chunks++;
             }
         }
 
         self::assertSame(2, $chunks);
+        foreach ($yielded as $response) {
+            self::assertInstanceOf(MeteredResponse::class, $response);
+        }
+    }
+
+    public function testStreamReKeysChunksToMeteredResponseForDecoratorsAbove(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('ok', ['http_code' => 200]));
+        $client = new MeteredHttpClient($mockClient, 'test');
+
+        $response = $client->request('GET', 'https://api.example.com/');
+
+        // Decorators above MeteredHttpClient (e.g. RetryableHttpClient) hand
+        // back the wrapper they received. They must be able to look it up in
+        // the stream output, otherwise Symfony's AsyncResponse throws
+        // "UnexpectedValueException: Object not found".
+        foreach ($client->stream($response) as $yielded => $chunk) {
+            self::assertSame($response, $yielded);
+            if ($chunk->isLast()) {
+                break;
+            }
+        }
     }
 
     public function testResetClearsCachedMeter(): void
