@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-05-10
+
+### Added
+
+- **Metrics foundation** — new `MeterRegistry` service and `OpenTelemetryMetricsMiddleware` for Symfony Messenger consumer-side metrics (`messaging.process.duration` histogram, `messaging.client.consumed.messages` counter) with OTel semantic convention attributes. Off by default; enable with `metrics.enabled: true` and `metrics.messenger.enabled: true` ([#27](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/27))
+- **`Util\ErrorTypeResolver`** — shared utility for resolving `error.type` attribute from exceptions, with anonymous class fallback to parent FQCN ([#32](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/32))
+- Unit and functional test coverage improvements ([#20](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/20))
+
+### Fixed
+
+- **`TraceableHttpClient::stream()` breaks `RetryableHttpClient`** — stream chunks were keyed by the inner (unwrapped) response instead of the `TracedResponse` wrapper, causing `UnexpectedValueException: Object not found` in `AsyncResponse` when any decorator using `AsyncResponse` (e.g. `RetryableHttpClient`) sat above `TraceableHttpClient` in the chain. Now re-keys chunks using `SplObjectStorage`, mirroring Symfony's own `TraceableResponse::stream()` pattern ([#34](https://github.com/tracewayapp/opentelemetry-symfony-bundle/issues/34), [#35](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/35))
+- **Metrics never mask handler exceptions** — metric recording failures are swallowed so a broken meter provider cannot interfere with Messenger message handling ([#27](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/27))
+- **Second-based histogram buckets** — `messaging.process.duration` now uses explicit second-based bucket boundaries aligned with OTel conventions ([#27](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/27))
+- **Anonymous class `error.type`** — classes containing `@anonymous` in their FQCN now fall back to the parent class name ([#27](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/27))
+- **PHP 8.1 compat** — replaced `iterator_to_array()` with spread operator where needed ([#27](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/27))
+
 ## [1.6.1] - 2026-04-16
 
 ### Fixed
@@ -220,6 +236,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Messenger root spans for task-oriented backends (Traceway, Sentry)
 - 58 unit tests with 131 assertions
 
+[1.7.0]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.6.1...v1.7.0
+[1.6.1]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/tracewayapp/opentelemetry-symfony-bundle/compare/v1.4.3...v1.4.4
