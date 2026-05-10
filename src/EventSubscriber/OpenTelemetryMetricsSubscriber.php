@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Traceway\OpenTelemetryBundle\EventSubscriber;
 
 use OpenTelemetry\API\Globals;
-use OpenTelemetry\API\Metrics\CounterInterface;
 use OpenTelemetry\API\Metrics\HistogramInterface;
 use OpenTelemetry\API\Metrics\MeterInterface;
 use OpenTelemetry\API\Metrics\UpDownCounterInterface;
