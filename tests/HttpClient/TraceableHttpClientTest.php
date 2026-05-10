@@ -9,6 +9,7 @@ use OpenTelemetry\API\Trace\StatusCode;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpClient\RetryableHttpClient;
 use Traceway\OpenTelemetryBundle\HttpClient\TraceableHttpClient;
 use Traceway\OpenTelemetryBundle\HttpClient\TracedResponse;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
@@ -388,5 +389,44 @@ final class TraceableHttpClientTest extends TestCase
 
         $spans = $this->exporter->getSpans();
         self::assertCount(2, $spans, 'Guard must reset after exception so next call is traced');
+    }
+
+    public function testStreamReKeysChunksToTracedResponse(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('{"ok":true}'));
+        $client = new TraceableHttpClient($mockClient);
+
+        $response = $client->request('GET', 'https://api.example.com/data');
+        self::assertInstanceOf(TracedResponse::class, $response);
+
+        $stream = $client->stream([$response]);
+        foreach ($stream as $r => $chunk) {
+            self::assertInstanceOf(TracedResponse::class, $r);
+            self::assertSame($response, $r);
+        }
+    }
+
+    public function testStreamWorksWithRetryableHttpClient(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('{"data":"value"}', ['http_code' => 200]));
+        $traced = new TraceableHttpClient($mockClient);
+        $retryable = new RetryableHttpClient($traced, maxRetries: 3);
+
+        $response = $retryable->request('GET', 'https://api.example.com/json');
+        $data = $response->toArray();
+
+        self::assertSame(['data' => 'value'], $data);
+    }
+
+    public function testStreamWorksWithRetryableHttpClientGetContent(): void
+    {
+        $mockClient = new MockHttpClient(new MockResponse('hello world', ['http_code' => 200]));
+        $traced = new TraceableHttpClient($mockClient);
+        $retryable = new RetryableHttpClient($traced, maxRetries: 3);
+
+        $response = $retryable->request('GET', 'https://api.example.com/text');
+        $content = $response->getContent();
+
+        self::assertSame('hello world', $content);
     }
 }

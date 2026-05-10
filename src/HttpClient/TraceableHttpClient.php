@@ -12,6 +12,7 @@ use OpenTelemetry\Context\Context;
 use OpenTelemetry\SemConv\Attributes\HttpAttributes;
 use OpenTelemetry\SemConv\Attributes\ServerAttributes;
 use OpenTelemetry\SemConv\Attributes\UrlAttributes;
+use Symfony\Component\HttpClient\Response\ResponseStream;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use Symfony\Contracts\HttpClient\ResponseStreamInterface;
@@ -117,16 +118,25 @@ final class TraceableHttpClient implements HttpClientInterface, ResetInterface
             $responses = [$responses];
         }
 
+        $tracedMap = new \SplObjectStorage();
         $underlyingResponses = [];
 
-        /** @var ResponseInterface $response */
         foreach ($responses as $response) {
-            $underlyingResponses[] = $response instanceof TracedResponse
-                ? $response->getInnerResponse()
-                : $response;
+            if ($response instanceof TracedResponse) {
+                $inner = $response->getInnerResponse();
+                $tracedMap[$inner] = $response;
+                $underlyingResponses[] = $inner;
+            } else {
+                $tracedMap[$response] = $response;
+                $underlyingResponses[] = $response;
+            }
         }
 
-        return $this->client->stream($underlyingResponses, $timeout);
+        return new ResponseStream((function () use ($tracedMap, $underlyingResponses, $timeout) {
+            foreach ($this->client->stream($underlyingResponses, $timeout) as $response => $chunk) {
+                yield $tracedMap[$response] => $chunk;
+            }
+        })());
     }
 
     /**
