@@ -161,7 +161,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
         }
 
-        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}} $metrics */
+        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_client: array{enabled: bool, excluded_hosts: list<string>}} $metrics */
         $metrics = $config['metrics'];
         $meterName = $metrics['meter_name'];
 
@@ -181,14 +181,17 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->removeDefinition(OpenTelemetryMetricsMiddleware::class);
         }
 
-        /** @var array{doctrine?: array{enabled: bool}} $metricsTyped */
-        $metricsTyped = $metrics;
-        if ($metrics['enabled'] && ($metricsTyped['doctrine']['enabled'] ?? false) && $this->isDoctrineAvailable()) {
+        if ($metrics['enabled'] && $metrics['doctrine']['enabled'] && $this->isDoctrineAvailable()) {
             $definition = new Definition(DoctrineMeteredMiddleware::class);
             $definition->setArgument('$meterName', $meterName);
             $definition->addTag('doctrine.middleware');
             $container->setDefinition(DoctrineMeteredMiddleware::class, $definition);
         }
+
+        $httpClientMetricsEnabled = $metrics['enabled'] && $metrics['http_client']['enabled'] && $this->isHttpClientAvailable();
+        $container->setParameter('open_telemetry.http_client_metrics_enabled', $httpClientMetricsEnabled);
+        $container->setParameter('open_telemetry.metrics_meter_name', $meterName);
+        $container->setParameter('open_telemetry.http_client_metrics_excluded_hosts', $metrics['http_client']['excluded_hosts']);
     }
 
     private function isConsoleAvailable(): bool

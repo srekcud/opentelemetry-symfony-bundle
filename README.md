@@ -105,6 +105,9 @@ open_telemetry:
             excluded_queues: []
         doctrine:
             enabled: false             # emit db.client.operation.duration for every DBAL query/exec/transaction
+        http_client:
+            enabled: false             # emit http.client.request.duration and body size histograms
+            excluded_hosts: []         # OTLP endpoint is auto-excluded
 ```
 
 ### Environment Variables
@@ -176,6 +179,18 @@ Names and attributes follow OTel semantic conventions: [messaging metrics](https
 `messenger.excluded_queues` is matched on `ReceivedStamp::getTransportName()` (consume path only). Dispatch-side exclusion and dispatch metrics (`messaging.client.sent.messages`, `messaging.client.operation.duration`) are out of scope for this first metrics drop.
 
 The DBAL instrumentation wraps every connection produced by Doctrine. It records duration for `Connection::query()`, `Connection::exec()`, prepared `Statement::execute()`, and the transaction control methods (`beginTransaction`, `commit`, `rollBack`). The SQL text itself is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when it can be extracted unambiguously (`db.collection.name`).
+
+**HTTP Client** (outgoing requests):
+
+| Instrument | Kind | Unit | Stability | Attributes |
+|---|---|---|---|---|
+| `http.client.request.duration` | Histogram | `s` | **Stable** | `http.request.method`, `server.address`, `server.port`, `url.scheme`, `http.response.status_code` on response, `error.type` on transport failure |
+| `http.client.request.body.size` | Histogram | `By` | Development | Same as duration (emitted when `Content-Length` header or a string body is present) |
+| `http.client.response.body.size` | Histogram | `By` | Development | Same as duration (emitted when response `Content-Length` is set or the body is fully read) |
+
+Names follow the [OTel HTTP metrics semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/). `http_client.excluded_hosts` is a list of hostnames to skip; the OTLP endpoint (from `OTEL_EXPORTER_OTLP_ENDPOINT`) is always auto-excluded to prevent instrumentation loops.
+
+Connection-pool metrics (`http.client.open_connections`, `http.client.connection.duration`, `http.client.active_requests`) require low-level access to the HTTP client pool that Symfony HttpClient does not expose; they are out of scope for this drop.
 
 ### Manual Instrumentation
 
