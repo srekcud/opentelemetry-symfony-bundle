@@ -510,6 +510,32 @@ final class OtelLogHandlerTest extends TestCase
         self::assertArrayNotHasKey('function', $attrs);
     }
 
+    public function testUnprefixedModeExtraOverridesContextOnKeyCollision(): void
+    {
+        // In flat mode, the same key can appear in both context (PSR-3) and extra (Monolog
+        // processor metadata). Context is written first, extra last — extra wins. This
+        // locks in the precedence so future loop-reordering can't flip it silently.
+        $handler = new OtelLogHandler(unprefixedAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            context: ['request_id' => 'from-context'],
+            extra: ['request_id' => 'from-extra'],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('from-extra', $attrs['request_id']);
+    }
+
     public function testUnprefixedModeStillSkipsTraceIdAndSpanIdInExtra(): void
     {
         $handler = new OtelLogHandler(unprefixedAttributes: true);
