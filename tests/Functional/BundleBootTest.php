@@ -126,6 +126,23 @@ final class BundleBootTest extends TestCase
         $this->boot(['log_export_enabled' => true]);
     }
 
+    public function testLogExportCaptureCodeAttributesFlagFlowsToHandler(): void
+    {
+        $container = $this->boot(
+            [
+                'log_export_enabled' => true,
+                'log_export_capture_code_attributes' => true,
+            ],
+            [new \Symfony\Bundle\MonologBundle\MonologBundle()],
+        );
+
+        $handler = $container->get(OtelLogHandler::class);
+        self::assertInstanceOf(OtelLogHandler::class, $handler);
+
+        $captureFlag = (new \ReflectionClass($handler))->getProperty('captureCodeAttributes');
+        self::assertTrue($captureFlag->getValue($handler));
+    }
+
     public function testHttpClientExcludedHostsParameter(): void
     {
         $this->boot(['http_client_excluded_hosts' => ['collector.local']]);

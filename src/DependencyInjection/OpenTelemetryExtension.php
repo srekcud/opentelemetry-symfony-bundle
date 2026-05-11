@@ -75,6 +75,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
 
             $handlerDef = new Definition(OtelLogHandler::class);
             $handlerDef->setArgument('$level', $config['log_export_level']);
+            $handlerDef->setArgument('$captureCodeAttributes', $config['log_export_capture_code_attributes']);
             $handlerDef->setAutoconfigured(true);
             $container->setDefinition(OtelLogHandler::class, $handlerDef);
 
