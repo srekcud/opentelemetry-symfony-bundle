@@ -92,6 +92,7 @@ open_telemetry:
     log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
     log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
     log_export_capture_code_attributes: false  # resolve code.file.path/code.line.number/code.function.name via debug_backtrace when Monolog's IntrospectionProcessor is not installed
+    log_export_unprefixed_attributes: false    # emit Monolog context/extra fields as flat OTel attributes (Java/Python/.NET/JS shape) instead of monolog.context.*/monolog.extra.*. Default flips to true in v2.0.
 
     # `metrics` is intentionally nested. The rest of the bundle still uses
     # flat keys for 1.x, but metrics landed nested from day one to align with

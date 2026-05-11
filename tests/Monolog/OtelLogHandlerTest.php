@@ -441,6 +441,103 @@ final class OtelLogHandlerTest extends TestCase
         self::assertSame([1, null, 3], $attrs['monolog.context.ids']);
     }
 
+    public function testUnprefixedAttributesFlattensContextAndExtra(): void
+    {
+        $handler = new OtelLogHandler(unprefixedAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            context: ['user_id' => 42, 'action' => 'login'],
+            extra: ['request_id' => 'abc-123', 'pid' => 7777],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame(42, $attrs['user_id']);
+        self::assertSame('login', $attrs['action']);
+        self::assertSame('abc-123', $attrs['request_id']);
+        self::assertSame(7777, $attrs['pid']);
+
+        self::assertArrayNotHasKey('monolog.context.user_id', $attrs);
+        self::assertArrayNotHasKey('monolog.context.action', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.request_id', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.pid', $attrs);
+    }
+
+    public function testUnprefixedModeStillSuppressesIntrospectionKeysFromExtraNamespace(): void
+    {
+        // file/line/class/function in extras are promoted to code.* regardless of prefix mode.
+        // The raw keys must not leak into the unprefixed attribute namespace either.
+        $handler = new OtelLogHandler(unprefixedAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/var/www/src/foo.php',
+                'line' => 7,
+                'class' => 'App\\Foo',
+                'function' => 'bar',
+                'request_id' => 'keep-me',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('/var/www/src/foo.php', $attrs['code.file.path']);
+        self::assertSame(7, $attrs['code.line.number']);
+        self::assertSame('App\\Foo::bar', $attrs['code.function.name']);
+        self::assertSame('keep-me', $attrs['request_id']);
+
+        self::assertArrayNotHasKey('file', $attrs);
+        self::assertArrayNotHasKey('line', $attrs);
+        self::assertArrayNotHasKey('class', $attrs);
+        self::assertArrayNotHasKey('function', $attrs);
+    }
+
+    public function testUnprefixedModeStillSkipsTraceIdAndSpanIdInExtra(): void
+    {
+        $handler = new OtelLogHandler(unprefixedAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'trace_id' => 'deadbeef',
+                'span_id' => 'cafef00d',
+                'request_id' => 'abc-123',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertArrayNotHasKey('trace_id', $attrs);
+        self::assertArrayNotHasKey('span_id', $attrs);
+        self::assertSame('abc-123', $attrs['request_id']);
+    }
+
     public function testPromotesIntrospectionExtrasToCodeAttributes(): void
     {
         $handler = new OtelLogHandler();

@@ -143,6 +143,23 @@ final class BundleBootTest extends TestCase
         self::assertTrue($captureFlag->getValue($handler));
     }
 
+    public function testLogExportUnprefixedAttributesFlagFlowsToHandler(): void
+    {
+        $container = $this->boot(
+            [
+                'log_export_enabled' => true,
+                'log_export_unprefixed_attributes' => true,
+            ],
+            [new \Symfony\Bundle\MonologBundle\MonologBundle()],
+        );
+
+        $handler = $container->get(OtelLogHandler::class);
+        self::assertInstanceOf(OtelLogHandler::class, $handler);
+
+        $unprefixedFlag = (new \ReflectionClass($handler))->getProperty('unprefixedAttributes');
+        self::assertTrue($unprefixedFlag->getValue($handler));
+    }
+
     public function testHttpClientExcludedHostsParameter(): void
     {
         $this->boot(['http_client_excluded_hosts' => ['collector.local']]);
