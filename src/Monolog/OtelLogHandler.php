@@ -62,8 +62,7 @@ final class OtelLogHandler extends AbstractProcessingHandler implements ResetInt
                 ->setTimestamp(((int) $record->datetime->format('Uu')) * 1000)
                 ->setSeverityNumber(Severity::fromPsr3($record->level->toPsrLogLevel()))
                 ->setSeverityText($record->level->getName())
-                ->setBody($record->message)
-                ->setAttribute('monolog.channel', $record->channel);
+                ->setBody($record->message);
 
             foreach ($record->context as $key => $value) {
                 if ('exception' === $key && $value instanceof \Throwable) {

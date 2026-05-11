@@ -251,8 +251,11 @@ final class OtelLogHandlerTest extends TestCase
         self::assertSame('abc-123', $attrs['monolog.extra.request_id']);
     }
 
-    public function testSetsChannelAttribute(): void
+    public function testDoesNotEmitRedundantChannelAttribute(): void
     {
+        // The Monolog channel is encoded as the OTel InstrumentationScope name (see
+        // testEachChannelBecomesAnInstrumentationScope). Java/Python/.NET/JS do the
+        // same and do not duplicate it as an attribute. This guards against regression.
         $handler = new OtelLogHandler();
 
         $record = new LogRecord(
@@ -267,7 +270,8 @@ final class OtelLogHandlerTest extends TestCase
         $logs = $this->logExporter->getStorage();
         /** @var ReadableLogRecord $log */
         $log = $logs[0];
-        self::assertSame('security', $log->getAttributes()->toArray()['monolog.channel']);
+        self::assertArrayNotHasKey('monolog.channel', $log->getAttributes()->toArray());
+        self::assertSame('security', $log->getInstrumentationScope()->getName());
     }
 
     public function testRespectsLevelFilter(): void
