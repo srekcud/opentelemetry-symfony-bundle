@@ -437,6 +437,232 @@ final class OtelLogHandlerTest extends TestCase
         self::assertSame([1, null, 3], $attrs['monolog.context.ids']);
     }
 
+    public function testPromotesIntrospectionExtrasToCodeAttributes(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/var/www/src/Controller/UserController.php',
+                'line' => 42,
+                'class' => 'App\\Controller\\UserController',
+                'callType' => '->',
+                'function' => 'show',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('/var/www/src/Controller/UserController.php', $attrs['code.file.path']);
+        self::assertSame(42, $attrs['code.line.number']);
+        self::assertSame('App\\Controller\\UserController::show', $attrs['code.function.name']);
+    }
+
+    public function testDoesNotEmitDuplicateMonologExtraKeysWhenPromoting(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/var/www/src/foo.php',
+                'line' => 7,
+                'class' => 'App\\Foo',
+                'callType' => '::',
+                'function' => 'bar',
+                'request_id' => 'keep-me',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertArrayNotHasKey('monolog.extra.file', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.line', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.class', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.callType', $attrs);
+        self::assertArrayNotHasKey('monolog.extra.function', $attrs);
+        self::assertSame('keep-me', $attrs['monolog.extra.request_id']);
+    }
+
+    public function testPromotesBareFunctionWithoutClass(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/var/www/script.php',
+                'line' => 9,
+                'function' => 'top_level_helper',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('top_level_helper', $attrs['code.function.name']);
+    }
+
+    public function testOmitsFunctionAttributeWhenOnlyFileAndLineAvailable(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/var/www/script.php',
+                'line' => 9,
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('/var/www/script.php', $attrs['code.file.path']);
+        self::assertSame(9, $attrs['code.line.number']);
+        self::assertArrayNotHasKey('code.function.name', $attrs);
+    }
+
+    public function testIgnoresIntrospectionExtrasOfWrongType(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => 123,
+                'line' => '42',
+                'class' => [],
+                'function' => null,
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertArrayNotHasKey('code.file.path', $attrs);
+        self::assertArrayNotHasKey('code.line.number', $attrs);
+        self::assertArrayNotHasKey('code.function.name', $attrs);
+    }
+
+    public function testEmitsNoCodeAttributesByDefaultWhenExtrasAreEmpty(): void
+    {
+        $handler = new OtelLogHandler();
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertArrayNotHasKey('code.file.path', $attrs);
+        self::assertArrayNotHasKey('code.line.number', $attrs);
+        self::assertArrayNotHasKey('code.function.name', $attrs);
+    }
+
+    public function testBacktraceFallbackResolvesCallSiteWhenEnabled(): void
+    {
+        $handler = new OtelLogHandler(captureCodeAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+        );
+
+        $this->emitThroughBundleFrame($handler, $record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame(self::class . '::emitThroughBundleFrame', $attrs['code.function.name']);
+        self::assertSame(__FILE__, $attrs['code.file.path']);
+        self::assertIsInt($attrs['code.line.number']);
+    }
+
+    public function testExtrasTakePrecedenceOverBacktraceFallback(): void
+    {
+        $handler = new OtelLogHandler(captureCodeAttributes: true);
+
+        $record = new LogRecord(
+            datetime: new \DateTimeImmutable(),
+            channel: 'app',
+            level: Level::Info,
+            message: 'test',
+            extra: [
+                'file' => '/explicit/file.php',
+                'line' => 100,
+                'class' => 'Explicit\\Class',
+                'function' => 'explicit',
+            ],
+        );
+
+        $handler->handle($record);
+
+        $logs = $this->logExporter->getStorage();
+        /** @var ReadableLogRecord $log */
+        $log = $logs[0];
+        $attrs = $log->getAttributes()->toArray();
+
+        self::assertSame('/explicit/file.php', $attrs['code.file.path']);
+        self::assertSame(100, $attrs['code.line.number']);
+        self::assertSame('Explicit\\Class::explicit', $attrs['code.function.name']);
+    }
+
+    private function emitThroughBundleFrame(OtelLogHandler $handler, LogRecord $record): void
+    {
+        $handler->handle($record);
+    }
+
     public function testResetClearsCachedLogger(): void
     {
         $handler = new OtelLogHandler();

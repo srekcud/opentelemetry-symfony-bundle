@@ -127,6 +127,23 @@ final class BundleBootTest extends TestCase
         $this->boot(['log_export_enabled' => true]);
     }
 
+    public function testLogExportCaptureCodeAttributesFlagFlowsToHandler(): void
+    {
+        $container = $this->boot(
+            [
+                'log_export_enabled' => true,
+                'log_export_capture_code_attributes' => true,
+            ],
+            [new \Symfony\Bundle\MonologBundle\MonologBundle()],
+        );
+
+        $handler = $container->get(OtelLogHandler::class);
+        self::assertInstanceOf(OtelLogHandler::class, $handler);
+
+        $captureFlag = (new \ReflectionClass($handler))->getProperty('captureCodeAttributes');
+        self::assertTrue($captureFlag->getValue($handler));
+    }
+
     public function testHttpClientExcludedHostsParameter(): void
     {
         $this->boot(['http_client_excluded_hosts' => ['collector.local']]);
@@ -261,6 +278,38 @@ final class BundleBootTest extends TestCase
         $this->boot([
             'metrics' => [
                 'http_server' => ['enabled' => true],
+            ],
+        ]);
+    }
+
+    public function testHttpClientMetricsDisabledByDefault(): void
+    {
+        $container = $this->boot(['metrics' => ['enabled' => true]]);
+
+        self::assertFalse($container->getParameter('open_telemetry.http_client_metrics_enabled'));
+    }
+
+    public function testHttpClientMetricsEnabledSetsParameter(): void
+    {
+        $container = $this->boot([
+            'metrics' => [
+                'enabled' => true,
+                'http_client' => ['enabled' => true, 'excluded_hosts' => ['cdn.example.com']],
+            ],
+        ]);
+
+        self::assertTrue($container->getParameter('open_telemetry.http_client_metrics_enabled'));
+        self::assertSame(['cdn.example.com'], $container->getParameter('open_telemetry.http_client_metrics_excluded_hosts'));
+    }
+
+    public function testHttpClientMetricsWithoutMetricsEnabledFails(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('metrics.http_client.enabled');
+
+        $this->boot([
+            'metrics' => [
+                'http_client' => ['enabled' => true],
             ],
         ]);
     }

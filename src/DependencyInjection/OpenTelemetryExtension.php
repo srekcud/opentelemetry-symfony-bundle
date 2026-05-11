@@ -76,6 +76,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
 
             $handlerDef = new Definition(OtelLogHandler::class);
             $handlerDef->setArgument('$level', $config['log_export_level']);
+            $handlerDef->setArgument('$captureCodeAttributes', $config['log_export_capture_code_attributes']);
             $handlerDef->setAutoconfigured(true);
             $container->setDefinition(OtelLogHandler::class, $handlerDef);
 
@@ -162,7 +163,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
         }
 
-        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_server: array{enabled: bool, excluded_paths: list<string>}} $metrics */
+        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_server: array{enabled: bool, excluded_paths: list<string>}, http_client: array{enabled: bool, excluded_hosts: list<string>}} $metrics */
         $metrics = $config['metrics'];
         $meterName = $metrics['meter_name'];
 
@@ -196,6 +197,11 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
         } else {
             $container->removeDefinition(OpenTelemetryMetricsSubscriber::class);
         }
+
+        $httpClientMetricsEnabled = $metrics['enabled'] && $metrics['http_client']['enabled'] && $this->isHttpClientAvailable();
+        $container->setParameter('open_telemetry.http_client_metrics_enabled', $httpClientMetricsEnabled);
+        $container->setParameter('open_telemetry.metrics_meter_name', $meterName);
+        $container->setParameter('open_telemetry.http_client_metrics_excluded_hosts', $metrics['http_client']['excluded_hosts']);
     }
 
     private function isConsoleAvailable(): bool
