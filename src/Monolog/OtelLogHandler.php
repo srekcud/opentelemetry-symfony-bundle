@@ -44,6 +44,7 @@ final class OtelLogHandler extends AbstractProcessingHandler implements ResetInt
         int|string|Level $level = Level::Debug,
         bool $bubble = true,
         private readonly bool $captureCodeAttributes = false,
+        private readonly bool $unprefixedAttributes = false,
     ) {
         parent::__construct($level, $bubble);
         $this->normalizer = new NormalizerFormatter();
@@ -64,12 +65,15 @@ final class OtelLogHandler extends AbstractProcessingHandler implements ResetInt
                 ->setSeverityText($record->level->getName())
                 ->setBody($record->message);
 
+            $contextPrefix = $this->unprefixedAttributes ? '' : 'monolog.context.';
+            $extraPrefix = $this->unprefixedAttributes ? '' : 'monolog.extra.';
+
             foreach ($record->context as $key => $value) {
                 if ('exception' === $key && $value instanceof \Throwable) {
                     $builder->setException($value);
                     continue;
                 }
-                $builder->setAttribute('monolog.context.' . $key, $this->toAttributeValue($value));
+                $builder->setAttribute($contextPrefix . $key, $this->toAttributeValue($value));
             }
 
             [$file, $line, $function] = $this->resolveCodeAttributes($record->extra);
@@ -92,7 +96,7 @@ final class OtelLogHandler extends AbstractProcessingHandler implements ResetInt
                 if (\in_array($key, self::INTROSPECTION_EXTRA_KEYS, true)) {
                     continue;
                 }
-                $builder->setAttribute('monolog.extra.' . $key, $this->toAttributeValue($value));
+                $builder->setAttribute($extraPrefix . $key, $this->toAttributeValue($value));
             }
 
             $builder->emit();
