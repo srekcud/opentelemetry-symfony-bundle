@@ -91,6 +91,7 @@ open_telemetry:
 
     log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
     log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
+    log_export_capture_code_attributes: false  # resolve code.file.path/code.line.number/code.function.name via debug_backtrace when Monolog's IntrospectionProcessor is not installed
 
     # `metrics` is intentionally nested. The rest of the bundle still uses
     # flat keys for 1.x, but metrics landed nested from day one to align with
