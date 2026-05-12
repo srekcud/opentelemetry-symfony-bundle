@@ -6,10 +6,13 @@ namespace Traceway\OpenTelemetryBundle\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Doctrine\DBAL\Driver\Middleware as DoctrineMiddleware;
@@ -19,6 +22,8 @@ use Traceway\OpenTelemetryBundle\EventSubscriber\ConsoleSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetryMetricsSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
+use Traceway\OpenTelemetryBundle\Mailer\TraceableMailer;
+use Traceway\OpenTelemetryBundle\Mailer\TraceableTransports;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMiddleware;
 use Traceway\OpenTelemetryBundle\Metrics\MeterRegistry;
@@ -158,6 +163,21 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->setDefinition(OpenTelemetryTwigExtension::class, $twigExtDef);
         }
 
+        if ($config['mailer_enabled'] && $this->isMailerAvailable()) {
+            $mailerDef = new Definition(TraceableMailer::class);
+            $mailerDef->setDecoratedService('mailer.mailer', null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+            $mailerDef->setArgument('$decorated', new Reference('.inner'));
+            $mailerDef->setArgument('$tracerName', $tracerName);
+            $mailerDef->setArgument('$recordSubject', $config['mailer_record_subject']);
+            $container->setDefinition(TraceableMailer::class, $mailerDef);
+
+            $transportsDef = new Definition(TraceableTransports::class);
+            $transportsDef->setDecoratedService('mailer.transports', null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+            $transportsDef->setArgument('$decorated', new Reference('.inner'));
+            $transportsDef->setArgument('$tracerName', $tracerName);
+            $container->setDefinition(TraceableTransports::class, $transportsDef);
+        }
+
         if ($config['monolog_enabled'] && $this->isMonologAvailable()) {
             $monologDef = new Definition(TraceContextProcessor::class);
             $monologDef->addTag('monolog.processor');
@@ -238,5 +258,10 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
     private function isMonologAvailable(): bool
     {
         return class_exists(\Monolog\Logger::class);
+    }
+
+    private function isMailerAvailable(): bool
+    {
+        return interface_exists(MailerInterface::class);
     }
 }
