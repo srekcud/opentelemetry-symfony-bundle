@@ -51,6 +51,7 @@ final class TraceableTransportsTest extends TestCase
         $attributes = $spans[0]->getAttributes()->toArray();
         self::assertSame('symfony_mailer', $attributes['messaging.system']);
         self::assertSame('send', $attributes['messaging.operation.name']);
+        self::assertSame('send', $attributes['messaging.operation.type']);
         self::assertSame('abc123@example.com', $attributes['email.message_id']);
     }
 

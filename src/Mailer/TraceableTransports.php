@@ -14,6 +14,7 @@ use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Message;
 use Symfony\Component\Mime\RawMessage;
 use Symfony\Contracts\Service\ResetInterface;
+use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
 
 /**
  * Decorates the `mailer.transports` service (the {@see TransportInterface}
@@ -51,7 +52,8 @@ final class TraceableTransports implements TransportInterface, ResetInterface
             ->spanBuilder($spanName)
             ->setSpanKind(SpanKind::KIND_CLIENT)
             ->setAttribute('messaging.system', 'symfony_mailer')
-            ->setAttribute('messaging.operation.name', 'send');
+            ->setAttribute('messaging.operation.name', 'send')
+            ->setAttribute('messaging.operation.type', 'send');
 
         if (null !== $transportName) {
             $builder->setAttribute('messaging.destination.name', $transportName);
@@ -70,7 +72,7 @@ final class TraceableTransports implements TransportInterface, ResetInterface
             return $sent;
         } catch (\Throwable $e) {
             $span->recordException($e);
-            $span->setAttribute('error.type', $e::class);
+            $span->setAttribute('error.type', ErrorTypeResolver::resolve($e));
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
 
             throw $e;

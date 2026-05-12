@@ -14,6 +14,7 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Message;
 use Symfony\Component\Mime\RawMessage;
 use Symfony\Contracts\Service\ResetInterface;
+use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
 
 /**
  * Decorates {@see MailerInterface} to emit a PRODUCER span around send().
@@ -85,7 +86,7 @@ final class TraceableMailer implements MailerInterface, ResetInterface
             $span->setStatus(StatusCode::STATUS_OK);
         } catch (\Throwable $e) {
             $span->recordException($e);
-            $span->setAttribute('error.type', $e::class);
+            $span->setAttribute('error.type', ErrorTypeResolver::resolve($e));
             $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
 
             throw $e;
