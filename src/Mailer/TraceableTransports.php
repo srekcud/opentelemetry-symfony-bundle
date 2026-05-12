@@ -26,8 +26,9 @@ use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
  * {@see SentMessage::getMessageId()} is captured on success.
  *
  * Server address/port for SMTP transports would require per-transport
- * decoration via a compiler pass — deferred to a follow-up so we don't
- * grow this PR.
+ * decoration via a compiler pass. Intentionally omitted — the value is
+ * low-impact for the common single-transport case. Open an issue if your
+ * setup needs it.
  */
 final class TraceableTransports implements TransportInterface, ResetInterface
 {
