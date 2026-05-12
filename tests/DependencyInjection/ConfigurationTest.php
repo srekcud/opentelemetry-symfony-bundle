@@ -112,6 +112,33 @@ final class ConfigurationTest extends TestCase
         $this->process([['error_status_threshold' => 600]]);
     }
 
+    public function testHttpServerExcludedPathsAreNormalized(): void
+    {
+        $config = $this->process([[
+            'metrics' => [
+                'enabled' => true,
+                'http_server' => [
+                    'enabled' => true,
+                    'excluded_paths' => ['health', '/_profiler', 42, '_wdt'],
+                ],
+            ],
+        ]]);
+
+        self::assertSame(
+            ['/health', '/_profiler', '/_wdt'],
+            $config['metrics']['http_server']['excluded_paths'],
+        );
+    }
+
+    public function testHttpServerExcludedPathsDefaultsToEmpty(): void
+    {
+        $config = $this->process([[
+            'metrics' => ['enabled' => true],
+        ]]);
+
+        self::assertSame([], $config['metrics']['http_server']['excluded_paths']);
+    }
+
     /**
      * @param list<array<string, mixed>> $configs
      * @return array<string, mixed>
