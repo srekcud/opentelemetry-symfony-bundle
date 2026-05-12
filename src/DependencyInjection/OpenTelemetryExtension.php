@@ -16,6 +16,7 @@ use Doctrine\DBAL\Driver\Middleware as DoctrineMiddleware;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\MeteredMiddleware as DoctrineMeteredMiddleware;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\TraceableMiddleware as DoctrineTraceableMiddleware;
 use Traceway\OpenTelemetryBundle\EventSubscriber\ConsoleSubscriber;
+use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetryMetricsSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware;
@@ -75,6 +76,8 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
 
             $handlerDef = new Definition(OtelLogHandler::class);
             $handlerDef->setArgument('$level', $config['log_export_level']);
+            $handlerDef->setArgument('$captureCodeAttributes', $config['log_export_capture_code_attributes']);
+            $handlerDef->setArgument('$unprefixedAttributes', $config['log_export_unprefixed_attributes']);
             $handlerDef->setAutoconfigured(true);
             $container->setDefinition(OtelLogHandler::class, $handlerDef);
 
@@ -161,7 +164,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
         }
 
-        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}} $metrics */
+        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_server: array{enabled: bool, excluded_paths: list<string>}, http_client: array{enabled: bool, excluded_hosts: list<string>}} $metrics */
         $metrics = $config['metrics'];
         $meterName = $metrics['meter_name'];
 
@@ -181,14 +184,25 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->removeDefinition(OpenTelemetryMetricsMiddleware::class);
         }
 
-        /** @var array{doctrine?: array{enabled: bool}} $metricsTyped */
-        $metricsTyped = $metrics;
-        if ($metrics['enabled'] && ($metricsTyped['doctrine']['enabled'] ?? false) && $this->isDoctrineAvailable()) {
+        if ($metrics['enabled'] && $metrics['doctrine']['enabled'] && $this->isDoctrineAvailable()) {
             $definition = new Definition(DoctrineMeteredMiddleware::class);
             $definition->setArgument('$meterName', $meterName);
             $definition->addTag('doctrine.middleware');
             $container->setDefinition(DoctrineMeteredMiddleware::class, $definition);
         }
+
+        if ($metrics['enabled'] && $metrics['http_server']['enabled']) {
+            $container->getDefinition(OpenTelemetryMetricsSubscriber::class)
+                ->setArgument('$meterName', $meterName)
+                ->setArgument('$excludedPaths', $metrics['http_server']['excluded_paths']);
+        } else {
+            $container->removeDefinition(OpenTelemetryMetricsSubscriber::class);
+        }
+
+        $httpClientMetricsEnabled = $metrics['enabled'] && $metrics['http_client']['enabled'] && $this->isHttpClientAvailable();
+        $container->setParameter('open_telemetry.http_client_metrics_enabled', $httpClientMetricsEnabled);
+        $container->setParameter('open_telemetry.metrics_meter_name', $meterName);
+        $container->setParameter('open_telemetry.http_client_metrics_excluded_hosts', $metrics['http_client']['excluded_hosts']);
     }
 
     private function isConsoleAvailable(): bool

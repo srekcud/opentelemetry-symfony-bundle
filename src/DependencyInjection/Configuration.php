@@ -120,6 +120,14 @@ final class Configuration implements ConfigurationInterface
                         ->thenInvalid('Invalid log level %s')
                     ->end()
                 ->end()
+                ->booleanNode('log_export_capture_code_attributes')
+                    ->info('Resolve OTel code.file.path / code.line.number / code.function.name via debug_backtrace when Monolog\'s IntrospectionProcessor is not installed. Has a small per-log cost; prefer adding IntrospectionProcessor instead.')
+                    ->defaultFalse()
+                ->end()
+                ->booleanNode('log_export_unprefixed_attributes')
+                    ->info('Emit Monolog context and extra fields as flat OTel attributes instead of under "monolog.context.*" / "monolog.extra.*". Matches the cross-ecosystem shape (Java/Python/.NET/JS all emit user fields flat). Default will flip to true in v2.0.')
+                    ->defaultFalse()
+                ->end()
                 ->arrayNode('metrics')
                     ->info('OpenTelemetry metrics configuration. Off by default. Landed nested ahead of the v2 config rework; flat keys for other subsystems will migrate later.')
                     ->addDefaultsIfNotSet()
@@ -158,6 +166,49 @@ final class Configuration implements ConfigurationInterface
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('http_server')
+                            ->info('Automatic metrics for incoming HTTP requests.')
+                            ->addDefaultsIfNotSet()
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->info('Emit http.server.request.duration (histogram), http.server.active_requests (up/down counter), http.server.request.body.size and http.server.response.body.size (histograms). Requires metrics.enabled.')
+                                    ->defaultFalse()
+                                ->end()
+                                ->arrayNode('excluded_paths')
+                                    ->info('URL path prefixes to skip when emitting HTTP server metrics (e.g. /health, /_profiler).')
+                                    ->scalarPrototype()->end()
+                                    ->defaultValue([])
+                                    ->beforeNormalization()
+                                        ->ifArray()
+                                        ->then(static function (array $paths): array {
+                                            $normalized = [];
+                                            foreach ($paths as $p) {
+                                                if (!\is_string($p)) {
+                                                    continue;
+                                                }
+                                                $normalized[] = str_starts_with($p, '/') ? $p : '/' . $p;
+                                            }
+                                            return $normalized;
+                                        })
+                                    ->end()
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->arrayNode('http_client')
+                            ->info('Automatic metrics for outgoing HTTP client requests.')
+                            ->addDefaultsIfNotSet()
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->info('Emit http.client.request.duration (histogram), http.client.request.body.size and http.client.response.body.size (histograms) on outgoing requests. Requires metrics.enabled and symfony/http-client.')
+                                    ->defaultFalse()
+                                ->end()
+                                ->arrayNode('excluded_hosts')
+                                    ->info('Hostnames to skip when emitting HTTP client metrics. The OTLP endpoint is auto-excluded.')
+                                    ->scalarPrototype()->end()
+                                    ->defaultValue([])
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                     ->validate()
                         ->ifTrue(static function (array $c): bool {
@@ -172,6 +223,20 @@ final class Configuration implements ConfigurationInterface
                             return true === ($doctrine['enabled'] ?? false) && true !== ($c['enabled'] ?? false);
                         })
                         ->thenInvalid('"open_telemetry.metrics.doctrine.enabled" requires "open_telemetry.metrics.enabled" to be true.')
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static function (array $c): bool {
+                            $httpServer = \is_array($c['http_server'] ?? null) ? $c['http_server'] : [];
+                            return true === ($httpServer['enabled'] ?? false) && true !== ($c['enabled'] ?? false);
+                        })
+                        ->thenInvalid('"open_telemetry.metrics.http_server.enabled" requires "open_telemetry.metrics.enabled" to be true.')
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static function (array $c): bool {
+                            $httpClient = \is_array($c['http_client'] ?? null) ? $c['http_client'] : [];
+                            return true === ($httpClient['enabled'] ?? false) && true !== ($c['enabled'] ?? false);
+                        })
+                        ->thenInvalid('"open_telemetry.metrics.http_client.enabled" requires "open_telemetry.metrics.enabled" to be true.')
                     ->end()
                 ->end()
             ->end()

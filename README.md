@@ -91,6 +91,8 @@ open_telemetry:
 
     log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
     log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
+    log_export_capture_code_attributes: false  # resolve code.file.path/code.line.number/code.function.name via debug_backtrace when Monolog's IntrospectionProcessor is not installed
+    log_export_unprefixed_attributes: false    # emit Monolog context/extra fields as flat OTel attributes (Java/Python/.NET/JS shape) instead of monolog.context.*/monolog.extra.*. Default flips to true in v2.0.
 
     # `metrics` is intentionally nested. The rest of the bundle still uses
     # flat keys for 1.x, but metrics landed nested from day one to align with
@@ -105,6 +107,12 @@ open_telemetry:
             excluded_queues: []
         doctrine:
             enabled: false             # emit db.client.operation.duration for every DBAL query/exec/transaction
+        http_server:
+            enabled: false             # emit http.server.request.duration / active_requests / body sizes
+            excluded_paths: []         # same path-prefix rules as the tracing excluded_paths
+        http_client:
+            enabled: false             # emit http.client.request.duration and body size histograms
+            excluded_hosts: []         # OTLP endpoint is auto-excluded
 ```
 
 ### Environment Variables
@@ -172,12 +180,28 @@ open_telemetry:
 | `messaging.client.operation.duration` | Histogram | `s` | Messenger dispatch | Same shape, `messaging.operation.{name,type}` = `send`, destination derived from `SentStamp::getSenderAlias()` (falls back to sender FQCN) |
 | `messaging.client.sent.messages` | Counter | `{message}` | Messenger dispatch | Same as above |
 | `db.client.operation.duration` | Histogram | `s` | DBAL connection | `db.system.name`, `db.namespace`, `server.address`, `server.port`, `db.operation.name`, `db.collection.name` (when extractable), `error.type` on failure |
+| `http.server.request.duration` | Histogram | `s` | HTTP server | `http.request.method`, `url.scheme`, `http.route` if matched, `http.response.status_code`, `server.address`, `server.port`, `error.type` on failure |
+| `http.server.active_requests` | UpDownCounter | `{request}` | HTTP server | `http.request.method`, `url.scheme`, `server.address`, `server.port` |
+| `http.server.request.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
+| `http.server.response.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
 
-Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development) and [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable). The general `error.type` attribute is Stable. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
+Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development), [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable), and [HTTP metrics](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/) (`http.server.request.duration` is Stable; the others are Development). The general `error.type` attribute is Stable. Only main HTTP requests are measured; sub-requests are already covered by the main request duration. `http_server.excluded_paths` uses the same prefix-match rules as the tracing `excluded_paths`. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
 
 `messenger.excluded_queues` matches the transport name on both sides — `ReceivedStamp::getTransportName()` on the consume path and `SentStamp::getSenderAlias()` on the dispatch path. A dispatched envelope landing on multiple transports emits one metric point per non-excluded transport.
 
 The DBAL instrumentation wraps every connection produced by Doctrine. It records duration for `Connection::query()`, `Connection::exec()`, prepared `Statement::execute()`, and the transaction control methods (`beginTransaction`, `commit`, `rollBack`). The SQL text itself is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when it can be extracted unambiguously (`db.collection.name`).
+
+**HTTP Client** (outgoing requests):
+
+| Instrument | Kind | Unit | Stability | Attributes |
+|---|---|---|---|---|
+| `http.client.request.duration` | Histogram | `s` | **Stable** | `http.request.method`, `server.address`, `server.port`, `url.scheme`, `http.response.status_code` on response, `error.type` on transport failure |
+| `http.client.request.body.size` | Histogram | `By` | Development | Same as duration (emitted when `Content-Length` header or a string body is present) |
+| `http.client.response.body.size` | Histogram | `By` | Development | Same as duration (emitted when response `Content-Length` is set or the body is fully read) |
+
+Names follow the [OTel HTTP metrics semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/). `http_client.excluded_hosts` is a list of hostnames to skip; the OTLP endpoint (from `OTEL_EXPORTER_OTLP_ENDPOINT`) is always auto-excluded to prevent instrumentation loops.
+
+Connection-pool metrics (`http.client.open_connections`, `http.client.connection.duration`, `http.client.active_requests`) require low-level access to the HTTP client pool that Symfony HttpClient does not expose; they are out of scope for this drop.
 
 ### Manual Instrumentation
 

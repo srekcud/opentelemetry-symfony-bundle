@@ -8,6 +8,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Lightweight helper for creating OpenTelemetry spans with minimal boilerplate.
@@ -18,7 +19,7 @@ use OpenTelemetry\API\Trace\TracerInterface;
  *         return $this->redis->get($key);
  *     }, attributes: ['cache.key' => $key]);
  */
-final class Tracing implements TracingInterface
+final class Tracing implements TracingInterface, ResetInterface
 {
     private ?TracerInterface $tracer = null;
     private ?bool $enabled = null;
@@ -65,6 +66,12 @@ final class Tracing implements TracingInterface
             $span->end();
             $scope->detach();
         }
+    }
+
+    public function reset(): void
+    {
+        $this->tracer = null;
+        $this->enabled = null;
     }
 
     private function isEnabled(): bool

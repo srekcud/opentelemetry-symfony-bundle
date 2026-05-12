@@ -95,19 +95,19 @@ final class TraceableHttpClient implements HttpClientInterface, ResetInterface
         $this->inFlight = true;
 
         try {
-            $response = $this->client->request($method, $url, $options);
-        } catch (\Throwable $e) {
-            $span->recordException($e);
-            $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
-            $span->end();
+            try {
+                $response = $this->client->request($method, $url, $options);
+            } catch (\Throwable $e) {
+                $span->recordException($e);
+                $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
+                $span->end();
+
+                throw $e;
+            }
+        } finally {
             $scope->detach();
             $this->inFlight = false;
-
-            throw $e;
         }
-
-        $scope->detach();
-        $this->inFlight = false;
 
         return new TracedResponse($response, $span);
     }

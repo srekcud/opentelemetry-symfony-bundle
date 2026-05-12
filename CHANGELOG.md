@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-05-11
+
+### Added
+
+- **OTel `code.*` log attributes (semconv Stable)** — `OtelLogHandler` now emits `code.file.path`, `code.line.number`, and `code.function.name` on log records, promoted from Monolog's `IntrospectionProcessor` extras. Backends with source-link support (Jaeger, Tempo, Datadog, etc.) render these as clickable links to your log call sites ([#36](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/36))
+- **`log_export_capture_code_attributes` config flag** — opt-in `debug_backtrace` fallback to resolve the new `code.*` attributes when `Monolog\Processor\IntrospectionProcessor` is not installed. Off by default; prefer installing the processor for zero-overhead resolution ([#36](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/36))
+- **`log_export_unprefixed_attributes` config flag** — opt into the flat cross-ecosystem attribute shape (Java/Python/.NET/JS all emit user log fields flat). When `true`, `$record->context` and `$record->extra` keys are emitted unprefixed instead of under `monolog.context.*` / `monolog.extra.*`. Default `false` for backward compatibility; will flip to `true` in v2.0 ([#39](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/39))
+- **Outgoing HTTP client metrics** — new `MeteredHttpClient` decorator emits `http.client.request.duration` (Histogram, semconv Stable), `http.client.request.body.size`, and `http.client.response.body.size` (Development) with OTel HTTP semantic-convention attributes. Off by default; enable with `metrics.http_client.enabled: true` ([#29](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/29) — thanks @srekcud)
+- **Doctrine DBAL metrics** — new metered middleware emits `db.client.operation.duration` (Histogram) for every DBAL query, exec, prepared statement execution, and transaction control. Off by default; enable with `metrics.doctrine.enabled: true` ([#31](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/31) — thanks @srekcud)
+- **`Tracing` implements `ResetInterface`** — the manual-instrumentation helper now joins every other lazy-tracer class in the bundle, clearing its cached tracer state between Symfony `kernel.reset` cycles. Closes the last `ResetInterface` gap; matters in long-running processes (Messenger workers, FrankenPHP, RoadRunner, Swoole) ([#38](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/38))
+
+### Changed
+
+- **`monolog.channel` attribute no longer emitted on log records** — the Monolog channel is exclusively represented as the OTel `InstrumentationScope` name (matching Java logback, Python `LoggingHandler`, .NET `OpenTelemetryLogger`, and JS Winston, none of which duplicate the channel/logger name as an attribute). If your dashboards filter by `monolog.channel = "X"`, switch to filtering by the scope name instead ([#37](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/37))
+- **`monolog.extra.{file,line,class,callType,function}` no longer emitted when `IntrospectionProcessor` extras are present** — those keys are promoted to canonical `code.*` attributes (see Added). Users running without `IntrospectionProcessor` are unaffected; users running with it should migrate dashboard queries to the new `code.*` keys ([#36](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/36), [#37](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/37))
+
+### Fixed
+
+- **`TraceableHttpClient::request()` cleanup-ordering bug** — if `$span->recordException()` or `$span->setStatus()` itself threw inside the catch block (rare, but possible when the OTel SDK or attribute serializer fails), `$inFlight` was left `true` and the scope was not detached, silently suppressing all future HTTP client spans on that instance until `reset()` fired. Cleanup is now wrapped in a `try { try { ... } catch (...) { record; end; throw; } } finally { detach; inFlight=false; }` shape that matches `Tracing::trace()`. Most users won't have observed the symptom, but the failure mode would have been particularly bad in long-running Messenger workers ([#38](https://github.com/tracewayapp/opentelemetry-symfony-bundle/pull/38))
+
 ## [1.7.0] - 2026-05-10
 
 ### Added

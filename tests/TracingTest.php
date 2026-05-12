@@ -7,6 +7,7 @@ namespace Traceway\OpenTelemetryBundle\Tests;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use PHPUnit\Framework\TestCase;
+use Symfony\Contracts\Service\ResetInterface;
 use Traceway\OpenTelemetryBundle\Tracing;
 use Traceway\OpenTelemetryBundle\TracingInterface;
 
@@ -100,6 +101,29 @@ final class TracingTest extends TestCase
             self::assertCount(1, $events);
             self::assertSame('exception', $events[0]->getName());
         }
+    }
+
+    public function testImplementsResetInterface(): void
+    {
+        self::assertInstanceOf(ResetInterface::class, new Tracing());
+    }
+
+    public function testResetClearsCachedTracerAndEnabled(): void
+    {
+        $tracing = new Tracing('test-tracer');
+        $tracing->trace('warm-up', fn () => null);
+
+        $reflection = new \ReflectionClass($tracing);
+        $tracerProp = $reflection->getProperty('tracer');
+        $enabledProp = $reflection->getProperty('enabled');
+
+        self::assertNotNull($tracerProp->getValue($tracing));
+        self::assertNotNull($enabledProp->getValue($tracing));
+
+        $tracing->reset();
+
+        self::assertNull($tracerProp->getValue($tracing));
+        self::assertNull($enabledProp->getValue($tracing));
     }
 
     public function testNestedTracesCreateParentChild(): void
