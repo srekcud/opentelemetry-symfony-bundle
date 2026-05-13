@@ -22,6 +22,7 @@ use Traceway\OpenTelemetryBundle\EventSubscriber\ConsoleSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetryMetricsSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
+use Traceway\OpenTelemetryBundle\EventSubscriber\SchedulerSubscriber;
 use Traceway\OpenTelemetryBundle\Mailer\TraceableMailer;
 use Traceway\OpenTelemetryBundle\Mailer\TraceableTransports;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware;
@@ -131,12 +132,22 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->removeDefinition(ConsoleSubscriber::class);
         }
 
+        $schedulerEnabled = $config['scheduler_enabled'] && $this->isSchedulerAvailable();
+
         if ($config['messenger_enabled'] && $this->isMessengerAvailable()) {
             $container->getDefinition(OpenTelemetryMiddleware::class)
                 ->setArgument('$tracerName', $tracerName)
-                ->setArgument('$rootSpans', $config['messenger_root_spans']);
+                ->setArgument('$rootSpans', $config['messenger_root_spans'])
+                ->setArgument('$excludeScheduledMessages', $schedulerEnabled);
         } else {
             $container->removeDefinition(OpenTelemetryMiddleware::class);
+        }
+
+        if ($schedulerEnabled) {
+            $schedulerDef = new Definition(SchedulerSubscriber::class);
+            $schedulerDef->setArgument('$tracerName', $tracerName);
+            $schedulerDef->setAutoconfigured(true);
+            $container->setDefinition(SchedulerSubscriber::class, $schedulerDef);
         }
 
         if ($config['doctrine_enabled'] && $this->isDoctrineAvailable()) {
@@ -260,6 +271,11 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
         return class_exists(\Monolog\Logger::class);
     }
 
+    private function isSchedulerAvailable(): bool
+    {
+        return interface_exists(\Symfony\Component\Scheduler\ScheduleProviderInterface::class);
+    }
+    
     private function isMailerAvailable(): bool
     {
         return interface_exists(MailerInterface::class);

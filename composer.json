@@ -38,6 +38,7 @@
         "symfony/http-client": "Required for automatic HttpClient outgoing request tracing",
         "symfony/mailer": "Required for automatic Mailer instrumentation (PRODUCER spans around MailerInterface::send and CLIENT spans around the transport)",
         "symfony/messenger": "Required for automatic Messenger job/task tracing",
+        "symfony/scheduler": "Required for automatic Scheduler tracing (CONSUMER spans around RecurringMessage execution, with trigger metadata)",
         "twig/twig": "Required for automatic Twig template rendering tracing",
         "monolog/monolog": "Required for log-trace correlation and OTel log export (trace_id/span_id injection + OTLP log shipping)",
         "symfony/monolog-bundle": "Required when log_export_enabled is true — wires OtelLogHandler into Monolog's handler stack"
@@ -54,6 +55,7 @@
         "symfony/messenger": "^6.4 || ^7.0 || ^8.0",
         "symfony/monolog-bundle": "^3.10 || ^4.0",
         "symfony/phpunit-bridge": "^6.4 || ^7.0 || ^8.0",
+        "symfony/scheduler": "^6.4 || ^7.0 || ^8.0",
         "twig/twig": "^3.0 || ^4.0"
     },
     "conflict": {

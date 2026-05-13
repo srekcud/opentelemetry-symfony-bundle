@@ -29,22 +29,35 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class OpenTelemetryMiddleware implements MiddlewareInterface, ResetInterface
 {
+    private const SCHEDULED_STAMP_CLASS = 'Symfony\\Component\\Scheduler\\Messenger\\ScheduledStamp';
+
     private ?TracerInterface $tracer = null;
     private ?bool $enabled = null;
 
     /**
-     * @param string $tracerName Instrumentation library name
-     * @param bool   $rootSpans  When true, consumed messages create root spans (no parent)
-     *                           so task-oriented backends classify them as independent jobs
+     * @param string $tracerName              Instrumentation library name
+     * @param bool   $rootSpans               When true, consumed messages create root spans (no parent)
+     *                                        so task-oriented backends classify them as independent jobs
+     * @param bool   $excludeScheduledMessages Skip envelopes carrying Symfony's ScheduledStamp on both dispatch and
+     *                                        consume paths. Enabled automatically when scheduler instrumentation is
+     *                                        active so the richer
+     *                                        {@see \Traceway\OpenTelemetryBundle\EventSubscriber\SchedulerSubscriber}
+     *                                        span owns scheduled-task observability without duplicate messenger spans.
      */
     public function __construct(
         private readonly string $tracerName = 'opentelemetry-symfony',
         private readonly bool $rootSpans = false,
-    ) {}
+        private readonly bool $excludeScheduledMessages = false,
+    ) {
+    }
 
     public function handle(Envelope $envelope, StackInterface $stack): Envelope
     {
         if (!$this->isEnabled()) {
+            return $stack->next()->handle($envelope, $stack);
+        }
+
+        if ($this->isScheduledMessage($envelope)) {
             return $stack->next()->handle($envelope, $stack);
         }
 
@@ -53,6 +66,19 @@ final class OpenTelemetryMiddleware implements MiddlewareInterface, ResetInterfa
         }
 
         return $this->handleDispatch($envelope, $stack);
+    }
+
+    private function isScheduledMessage(Envelope $envelope): bool
+    {
+        if (!$this->excludeScheduledMessages) {
+            return false;
+        }
+
+        if (!class_exists(self::SCHEDULED_STAMP_CLASS)) {
+            return false;
+        }
+
+        return null !== $envelope->last(self::SCHEDULED_STAMP_CLASS);
     }
 
     /**
