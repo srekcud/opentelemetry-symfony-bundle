@@ -2,11 +2,9 @@
   <a href="https://tracewayapp.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo%20White.png">
-      <img src="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo.png" height="72" alt="Traceway">
+      <img src="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo.png" height="100" alt="Traceway">
     </picture>
   </a>
-  <br>
-  <em>Built by <a href="https://tracewayapp.com">Traceway</a> — a managed OpenTelemetry backend with first-class Symfony support.</em>
 </p>
 
 # OpenTelemetry Symfony Bundle
