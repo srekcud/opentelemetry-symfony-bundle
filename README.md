@@ -8,7 +8,15 @@
 [![Symfony Version](https://img.shields.io/badge/symfony-%3E%3D6.4-000000.svg)](https://symfony.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Mailer, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger processing. No C extension required.
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo%20White.png">
+    <img src="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo.png" height="20" alt="Traceway">
+  </picture>
+  &nbsp;<em>Built by <a href="https://tracewayapp.com">Traceway</a> — a managed OpenTelemetry backend with first-class Symfony support.</em>
+</p>
+
+Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Mailer, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger, DBAL, and HTTP server/client. No C extension required.
 
 Works with any OpenTelemetry-compatible backend: [Traceway](https://tracewayapp.com), [Jaeger](https://www.jaegertracing.io/), [Zipkin](https://zipkin.io/), [Datadog](https://www.datadoghq.com/), [Grafana Tempo](https://grafana.com/oss/tempo/), [Honeycomb](https://www.honeycomb.io/), and more.
 
@@ -33,6 +41,8 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 
 > Use `http/json` unless you have `ext-protobuf` installed — see [Performance](#performance).
 
+With Symfony Flex the bundle auto-registers; without Flex, add `Traceway\OpenTelemetryBundle\OpenTelemetryBundle::class => ['all' => true]` to `config/bundles.php`.
+
 That's it. Every HTTP request, console command, outgoing call, Messenger job, DB query, cache operation, and Twig render is now traced.
 
 ## What Gets Traced
@@ -43,20 +53,14 @@ That's it. Every HTTP request, console command, outgoing call, Messenger job, DB
 | **Console commands** | SERVER | Command name, arguments, exit code, exceptions |
 | **HttpClient** | CLIENT | Outgoing requests with W3C context propagation, OTLP endpoint auto-excluded, re-entrance guard |
 | **Messenger** | PRODUCER/CONSUMER | Message class, transport, W3C context propagation across async boundaries |
-| **Scheduler** | CONSUMER | Per scheduled-task run: schedule name, trigger expression, next-run, cancellation marker. Requires `symfony/scheduler`. Auto-suppresses the parallel Messenger PRODUCER/CONSUMER spans via Symfony's `ScheduledStamp` |
+| **Scheduler** | CONSUMER | Per scheduled-task run: schedule name, trigger expression, next-run, cancellation marker. Requires `symfony/scheduler`. Messenger spans for scheduled envelopes are suppressed automatically |
 | **Mailer** | PRODUCER + CLIENT | Two-span split: PRODUCER on `MailerInterface::send` and CLIENT on the transport. Recipient count, message-id, `X-Transport` routing. Subject opt-in. Requires `symfony/mailer` |
 | **Doctrine DBAL** | CLIENT | SQL queries (parameterized), transactions, db system/namespace auto-detection. **DBAL 3.6+ and 4.x both CI-tested** |
 | **Cache** | INTERNAL | `get` (hit/miss), `delete`, `invalidateTags` with pool name. Requires `symfony/cache` |
 | **Twig** | INTERNAL | Template name, nested includes. Requires `twig/twig` |
-| **Monolog: log correlation** | — | Inject `trace_id` + `span_id` into every log record. Requires `monolog/monolog` |
-| **Monolog: log export** | — | Export log records via the OTel Logs API with native trace correlation and per-channel instrumentation scope. Requires `symfony/monolog-bundle`. **Off by default** |
+| **Monolog** | — | Inject `trace_id` + `span_id` into every log record (`monolog/monolog`). Opt-in OTel Logs API export with per-channel instrumentation scope (`symfony/monolog-bundle`, **off by default**) |
 
-Additional: response propagation (Server-Timing headers), `Tracing` helper for manual spans, full [OTel semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/).
-
-## Requirements
-
-- PHP >= 8.1, Symfony >= 6.4, OpenTelemetry PHP SDK >= 1.0
-- Doctrine DBAL >= 3.6 *(optional)*, Twig >= 3.0 *(optional)*
+Also: Server-Timing response headers, full [OTel semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/).
 
 ## Configuration
 
@@ -80,9 +84,9 @@ open_telemetry:
     messenger_enabled: true
     messenger_root_spans: false      # true = standalone traces per consumed message
 
-    scheduler_enabled: true          # CONSUMER span per scheduled-task run; suppresses the parallel Messenger spans via ScheduledStamp
-    mailer_enabled: true             # PRODUCER span around MailerInterface::send + CLIENT span around the transport
-    mailer_record_subject: false     # record the email subject as `email.subject` (off by default — subjects can be PII)
+    scheduler_enabled: true          # suppresses parallel Messenger spans for scheduled tasks
+    mailer_enabled: true
+    mailer_record_subject: false     # subjects can be PII
 
     doctrine_enabled: true
     doctrine_record_statements: true # false = hide SQL from spans
@@ -95,29 +99,24 @@ open_telemetry:
 
     monolog_enabled: true            # inject trace_id/span_id into log records
 
-    log_export_enabled: false        # export logs via OTel Logs API (requires symfony/monolog-bundle)
-    log_export_level: debug          # debug | info | notice | warning | error | critical | alert | emergency
-    log_export_capture_code_attributes: false  # resolve code.file.path/code.line.number/code.function.name via debug_backtrace when Monolog's IntrospectionProcessor is not installed
-    log_export_unprefixed_attributes: false    # emit Monolog context/extra fields as flat OTel attributes (Java/Python/.NET/JS shape) instead of monolog.context.*/monolog.extra.*. Default flips to true in v2.0.
+    log_export_enabled: false        # OTel Logs API export (requires symfony/monolog-bundle)
+    log_export_level: debug
+    log_export_capture_code_attributes: false  # fallback debug_backtrace when IntrospectionProcessor is absent
+    log_export_unprefixed_attributes: false    # emit context/extra as flat attributes (default flips in v2.0)
 
-    # `metrics` is intentionally nested. The rest of the bundle still uses
-    # flat keys for 1.x, but metrics landed nested from day one to align with
-    # the planned v2.0 config rework. Flat keys for tracing/logs will migrate
-    # to the nested shape in v2.0 — this is not an inconsistency, it is a
-    # forward-compatible choice.
-    metrics:
-        enabled: false                 # register MeterRegistry for manual instrumentation
+    metrics:                           # nested today; flat keys above migrate to nested in v2.0
+        enabled: false
         meter_name: 'opentelemetry-symfony'
         messenger:
-            enabled: false             # emit messaging.process.duration / messaging.client.consumed.messages
+            enabled: false
             excluded_queues: []
         doctrine:
-            enabled: false             # emit db.client.operation.duration for every DBAL query/exec/transaction
+            enabled: false
         http_server:
-            enabled: false             # emit http.server.request.duration / active_requests / body sizes
-            excluded_paths: []         # same path-prefix rules as the tracing excluded_paths
+            enabled: false
+            excluded_paths: []         # same prefix-match rules as tracing excluded_paths
         http_client:
-            enabled: false             # emit http.client.request.duration and body size histograms
+            enabled: false
             excluded_hosts: []         # OTLP endpoint is auto-excluded
 ```
 
@@ -163,7 +162,7 @@ Mock in tests with `$this->createStub(TracingInterface::class)` and have `trace(
 
 ## Metrics
 
-**Off by default.** Enable to export OpenTelemetry metrics alongside traces, with opt-in automatic instrumentation for Symfony Messenger and Doctrine DBAL.
+**Off by default.** Enable to export OpenTelemetry metrics alongside traces, with opt-in automatic instrumentation for Messenger, Doctrine DBAL, and HTTP server/client.
 
 ```yaml
 open_telemetry:
@@ -191,11 +190,11 @@ open_telemetry:
 | `http.server.request.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
 | `http.server.response.body.size` | Histogram | `By` | HTTP server | Same as duration (emitted when `Content-Length` is set) |
 
-Names and attributes follow OTel semantic conventions: [messaging metrics](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/) (Development), [database client metrics](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/) (Stable), and [HTTP metrics](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/) (`http.server.request.duration` is Stable; the others are Development). The general `error.type` attribute is Stable. Only main HTTP requests are measured; sub-requests are already covered by the main request duration. `http_server.excluded_paths` uses the same prefix-match rules as the tracing `excluded_paths`. Service identity (`service.name`, `service.namespace`, `service.version`) comes from the OTel resource, set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`, not from metric name prefixing.
+Names and attributes follow OTel semantic conventions ([messaging](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/), [database](https://opentelemetry.io/docs/specs/semconv/database/database-metrics/), [HTTP](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/)). `http.server.request.duration` and `error.type` are Stable; the rest are Development.
 
-`messenger.excluded_queues` matches the transport name on both sides — `ReceivedStamp::getTransportName()` on the consume path and `SentStamp::getSenderAlias()` on the dispatch path. A dispatched envelope landing on multiple transports emits one metric point per non-excluded transport.
-
-The DBAL instrumentation wraps every connection produced by Doctrine. It records duration for `Connection::query()`, `Connection::exec()`, prepared `Statement::execute()`, and the transaction control methods (`beginTransaction`, `commit`, `rollBack`). The SQL text itself is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when it can be extracted unambiguously (`db.collection.name`).
+- **HTTP server** — only main requests are measured; sub-requests are covered by the main duration. Service identity comes from the OTel resource (`OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`), not from metric name prefixing.
+- **Messenger** — `excluded_queues` matches the transport name on both sides (`ReceivedStamp::getTransportName()` on consume, `SentStamp::getSenderAlias()` on dispatch). A dispatched envelope landing on multiple transports emits one point per non-excluded transport.
+- **DBAL** — records duration for `Connection::query()`/`exec()`, prepared `Statement::execute()`, and transaction control methods. SQL text is **never** recorded — only the leading keyword (`db.operation.name`) and the primary table when extractable (`db.collection.name`).
 
 **HTTP Client** (outgoing requests):
 
@@ -205,11 +204,9 @@ The DBAL instrumentation wraps every connection produced by Doctrine. It records
 | `http.client.request.body.size` | Histogram | `By` | Development | Same as duration (emitted when `Content-Length` header or a string body is present) |
 | `http.client.response.body.size` | Histogram | `By` | Development | Same as duration (emitted when response `Content-Length` is set or the body is fully read) |
 
-Names follow the [OTel HTTP metrics semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/). `http_client.excluded_hosts` is a list of hostnames to skip; the OTLP endpoint (from `OTEL_EXPORTER_OTLP_ENDPOINT`) is always auto-excluded to prevent instrumentation loops.
+`http_client.excluded_hosts` skips matching hostnames; the OTLP endpoint (from `OTEL_EXPORTER_OTLP_ENDPOINT`) is always auto-excluded to prevent instrumentation loops.
 
-Connection-pool metrics (`http.client.open_connections`, `http.client.connection.duration`, `http.client.active_requests`) require low-level access to the HTTP client pool that Symfony HttpClient does not expose; they are out of scope for this drop.
-
-### Manual Instrumentation
+### Manual Metrics
 
 Inject `MeterRegistryInterface` to record your own counters, histograms, and up/down counters without touching the `MeterProvider` directly:
 
@@ -246,11 +243,9 @@ final class MediaDownloader
 }
 ```
 
-The registry caches instruments per name, so repeated `->counter('x')` calls return the same instance. When the OTel SDK is not configured, the NoOp meter provider returns no-op instruments and calls silently do nothing — safe to inject unconditionally.
+The registry caches instruments per name, so repeated `->counter('x')` calls return the same instance. When the OTel SDK is not configured, the NoOp meter provider returns no-op instruments — safe to inject unconditionally. The `@anonymous` guard above normalises anonymous-class names to their parent; otherwise `$e::class` embeds a filesystem path, leaking code locations and exploding label cardinality.
 
-The `@anonymous` guard normalises anonymous class names to their parent: `$e::class` would otherwise embed a filesystem path (`class@anonymous\0/var/www/src/Foo.php:42$0`), which leaks code locations and explodes label cardinality.
-
-### Environment Variables
+### Metrics Environment Variables
 
 | Variable | Example | Description |
 |---|---|---|
@@ -263,7 +258,11 @@ Near-zero overhead when the SDK is inactive — every component short-circuits v
 
 **Use `http/json` unless you have `ext-protobuf` installed.** PHP's native `json_encode()` is faster than the pure-PHP protobuf encoder, which adds significant CPU overhead under load. Switch to `http/protobuf` only with the C extension installed.
 
-For high-traffic apps: run a local OTel Collector at `localhost:4318` (sub-ms latency) and let it forward asynchronously, enable head sampling with `OTEL_TRACES_SAMPLER=parentbased_traceidratio` + `OTEL_TRACES_SAMPLER_ARG=0.1`, and use `excluded_paths` / `cache_excluded_pools` to drop noisy spans.
+For high-traffic apps:
+
+- Run a local OTel Collector at `localhost:4318` (sub-ms latency) and let it forward asynchronously.
+- Enable head sampling: `OTEL_TRACES_SAMPLER=parentbased_traceidratio` + `OTEL_TRACES_SAMPLER_ARG=0.1`.
+- Use `excluded_paths` / `cache_excluded_pools` to drop noisy spans.
 
 ## Contributing
 
