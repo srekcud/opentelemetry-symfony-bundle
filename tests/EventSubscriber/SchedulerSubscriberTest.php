@@ -175,7 +175,7 @@ final class SchedulerSubscriberTest extends TestCase
         self::assertCount(0, $this->exporter->getSpans());
     }
 
-    public function testResetClearsState(): void
+    public function testResetDrainsInFlightSpanAndClearsState(): void
     {
         $subscriber = new SchedulerSubscriber('test');
         $message = new \stdClass();
@@ -184,11 +184,14 @@ final class SchedulerSubscriberTest extends TestCase
         $subscriber->onPreRun($preRun);
         $subscriber->reset();
 
-        // Post-reset, the stored span reference is gone → Post is a no-op.
+        // Drain-on-reset ends the in-flight span and detaches its scope so a
+        // long-running worker doesn't leak telemetry or the active context.
+        self::assertCount(1, $this->exporter->getSpans());
+
+        // Post-reset, storage is empty → onPostRun is a no-op.
         $postRun = new PostRunEvent($this->buildSchedule(), $this->buildContext(), $message);
         $subscriber->onPostRun($postRun);
-
-        self::assertCount(0, $this->exporter->getSpans());
+        self::assertCount(1, $this->exporter->getSpans());
     }
 
     /**

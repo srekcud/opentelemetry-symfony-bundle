@@ -161,10 +161,29 @@ final class SchedulerSubscriber implements EventSubscriberInterface, ResetInterf
         $span->end();
     }
 
+    public function __destruct()
+    {
+        $this->drainSpans(suppressScopeNotice: true);
+    }
+
     public function reset(): void
     {
+        $this->drainSpans();
         $this->tracer = null;
         $this->enabled = null;
+    }
+
+    private function drainSpans(bool $suppressScopeNotice = false): void
+    {
+        foreach ($this->spans as $message) {
+            [$span, $scope] = $this->spans[$message];
+            if ($suppressScopeNotice) {
+                @$scope->detach();
+            } else {
+                $scope->detach();
+            }
+            $span->end();
+        }
         $this->spans = new \SplObjectStorage();
     }
 
