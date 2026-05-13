@@ -12,6 +12,9 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Middleware\StackMiddleware;
 use Symfony\Component\Messenger\Stamp\ConsumedByWorkerStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Scheduler\Generator\MessageContext;
+use Symfony\Component\Scheduler\Messenger\ScheduledStamp;
+use Symfony\Component\Scheduler\Trigger\PeriodicalTrigger;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMiddleware;
 use Traceway\OpenTelemetryBundle\Messenger\TraceContextStamp;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
@@ -168,6 +171,80 @@ final class OpenTelemetryMiddlewareTest extends TestCase
         self::assertCount(1, $spans);
         self::assertSame(StatusCode::STATUS_ERROR, $spans[0]->getStatus()->getCode());
         self::assertSame('handler failed', $spans[0]->getStatus()->getDescription());
+    }
+
+    public function testScheduledStampSkipsConsumeSpan(): void
+    {
+        $middleware = new OpenTelemetryMiddleware(
+            'test',
+            rootSpans: false,
+            excludeScheduledMessages: true,
+        );
+
+        $envelope = new Envelope(new \stdClass(), [
+            new ReceivedStamp('scheduler_default'),
+            new ScheduledStamp($this->buildScheduledMessageContext()),
+        ]);
+        $middleware->handle($envelope, new StackMiddleware());
+
+        self::assertCount(0, $this->exporter->getSpans());
+    }
+
+    public function testScheduledStampSkipsDispatchSpan(): void
+    {
+        $middleware = new OpenTelemetryMiddleware(
+            'test',
+            rootSpans: false,
+            excludeScheduledMessages: true,
+        );
+
+        $envelope = new Envelope(new \stdClass(), [
+            new ScheduledStamp($this->buildScheduledMessageContext()),
+        ]);
+        $middleware->handle($envelope, new StackMiddleware());
+
+        self::assertCount(0, $this->exporter->getSpans());
+    }
+
+    public function testScheduledStampIgnoredWhenFlagDisabled(): void
+    {
+        $middleware = new OpenTelemetryMiddleware(
+            'test',
+            rootSpans: false,
+            excludeScheduledMessages: false,
+        );
+
+        $envelope = new Envelope(new \stdClass(), [
+            new ReceivedStamp('scheduler_default'),
+            new ScheduledStamp($this->buildScheduledMessageContext()),
+        ]);
+        $middleware->handle($envelope, new StackMiddleware());
+
+        self::assertCount(1, $this->exporter->getSpans());
+    }
+
+    public function testFlagDoesNotAffectNonScheduledEnvelopes(): void
+    {
+        $middleware = new OpenTelemetryMiddleware(
+            'test',
+            rootSpans: false,
+            excludeScheduledMessages: true,
+        );
+
+        $envelope = new Envelope(new \stdClass(), [new ReceivedStamp('async')]);
+        $middleware->handle($envelope, new StackMiddleware());
+
+        self::assertCount(1, $this->exporter->getSpans());
+    }
+
+    private function buildScheduledMessageContext(): MessageContext
+    {
+        return new MessageContext(
+            name: 'default',
+            id: 'msg-1',
+            trigger: new PeriodicalTrigger(300),
+            triggeredAt: new \DateTimeImmutable('2026-05-12T19:00:00+00:00'),
+        );
     }
 
     public function testRootSpansCreatesDetachedTrace(): void

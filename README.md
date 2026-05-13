@@ -8,7 +8,7 @@
 [![Symfony Version](https://img.shields.io/badge/symfony-%3E%3D6.4-000000.svg)](https://symfony.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger processing. No C extension required.
+Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger processing. No C extension required.
 
 Works with any OpenTelemetry-compatible backend: [Traceway](https://tracewayapp.com), [Jaeger](https://www.jaegertracing.io/), [Zipkin](https://zipkin.io/), [Datadog](https://www.datadoghq.com/), [Grafana Tempo](https://grafana.com/oss/tempo/), [Honeycomb](https://www.honeycomb.io/), and more.
 
@@ -43,6 +43,7 @@ That's it. Every HTTP request, console command, outgoing call, Messenger job, DB
 | **Console commands** | SERVER | Command name, arguments, exit code, exceptions |
 | **HttpClient** | CLIENT | Outgoing requests with W3C context propagation, OTLP endpoint auto-excluded, re-entrance guard |
 | **Messenger** | PRODUCER/CONSUMER | Message class, transport, W3C context propagation across async boundaries |
+| **Scheduler** | CONSUMER | Per scheduled-task run: schedule name, trigger expression, next-run, cancellation marker. Requires `symfony/scheduler`. Auto-suppresses the parallel Messenger PRODUCER/CONSUMER spans via Symfony's `ScheduledStamp` |
 | **Doctrine DBAL** | CLIENT | SQL queries (parameterized), transactions, db system/namespace auto-detection. **DBAL 3.6+ and 4.x both CI-tested** |
 | **Cache** | INTERNAL | `get` (hit/miss), `delete`, `invalidateTags` with pool name. Requires `symfony/cache` |
 | **Twig** | INTERNAL | Template name, nested includes. Requires `twig/twig` |
@@ -77,6 +78,8 @@ open_telemetry:
 
     messenger_enabled: true
     messenger_root_spans: false      # true = standalone traces per consumed message
+
+    scheduler_enabled: true          # CONSUMER span per scheduled-task run; suppresses the parallel Messenger spans via ScheduledStamp
 
     doctrine_enabled: true
     doctrine_record_statements: true # false = hide SQL from spans
