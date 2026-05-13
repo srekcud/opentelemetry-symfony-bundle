@@ -1,3 +1,14 @@
+<p align="center">
+  <a href="https://tracewayapp.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo%20White.png">
+      <img src="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo.png" height="72" alt="Traceway">
+    </picture>
+  </a>
+  <br>
+  <em>Built by <a href="https://tracewayapp.com">Traceway</a> — a managed OpenTelemetry backend with first-class Symfony support.</em>
+</p>
+
 # OpenTelemetry Symfony Bundle
 
 [![CI](https://github.com/tracewayapp/opentelemetry-symfony-bundle/actions/workflows/ci.yml/badge.svg)](https://github.com/tracewayapp/opentelemetry-symfony-bundle/actions/workflows/ci.yml)
@@ -7,14 +18,6 @@
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-8892BF.svg)](https://php.net)
 [![Symfony Version](https://img.shields.io/badge/symfony-%3E%3D6.4-000000.svg)](https://symfony.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-<p>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo%20White.png">
-    <img src="https://raw.githubusercontent.com/tracewayapp/traceway/main/Traceway%20Logo.png" height="20" alt="Traceway">
-  </picture>
-  &nbsp;<em>Built by <a href="https://tracewayapp.com">Traceway</a> — a managed OpenTelemetry backend with first-class Symfony support.</em>
-</p>
 
 Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Mailer, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger, DBAL, and HTTP server/client. No C extension required.
 
