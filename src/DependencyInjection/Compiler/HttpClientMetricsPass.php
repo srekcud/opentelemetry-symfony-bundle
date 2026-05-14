@@ -15,10 +15,13 @@ use Traceway\OpenTelemetryBundle\HttpClient\MeteredHttpClient;
  * 'http_client' service with {@see MeteredHttpClient} when metrics are
  * enabled for the HTTP client subsystem.
  *
- * Decoration priority is -8, higher than {@see HttpClientTracingPass}'s -16,
- * so the metrics decorator wraps the trace decorator. Recorded duration
- * therefore reflects what the app observes, including any overhead added by
- * the tracing layer underneath.
+ * Decoration priority is -8, higher than {@see HttpClientTracingPass}'s -16.
+ * In Symfony's {@see \Symfony\Component\DependencyInjection\Compiler\DecoratorServicePass},
+ * decorators are processed via a max-heap priority queue: the highest priority
+ * is processed first and the lowest priority wins the public alias, so HIGHER
+ * priority = DEEPER nesting. The metric recording therefore happens INSIDE the
+ * active trace span scope, which is what enables SDK-level exemplar linkage
+ * from metric data points back to the corresponding trace.
  */
 final class HttpClientMetricsPass implements CompilerPassInterface
 {

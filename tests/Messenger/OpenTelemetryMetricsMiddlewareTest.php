@@ -16,6 +16,7 @@ use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\SentStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
 final class OpenTelemetryMetricsMiddlewareTest extends TestCase
@@ -213,7 +214,7 @@ final class OpenTelemetryMetricsMiddlewareTest extends TestCase
         $metrics = $this->collectMetrics();
         $points = [...$metrics['messaging.client.operation.duration']->data->dataPoints];
         self::assertSame(
-            OpenTelemetryMetricsMiddleware::DURATION_BUCKET_BOUNDARIES,
+            DurationBoundaries::SECONDS,
             $points[0]->explicitBounds,
         );
     }
@@ -362,7 +363,7 @@ final class OpenTelemetryMetricsMiddlewareTest extends TestCase
         $metrics = $this->collectMetrics();
         $points = [...$metrics['messaging.process.duration']->data->dataPoints];
         self::assertSame(
-            OpenTelemetryMetricsMiddleware::DURATION_BUCKET_BOUNDARIES,
+            DurationBoundaries::SECONDS,
             $points[0]->explicitBounds,
         );
     }

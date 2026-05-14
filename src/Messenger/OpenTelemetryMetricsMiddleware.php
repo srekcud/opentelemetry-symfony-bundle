@@ -15,6 +15,7 @@ use Symfony\Component\Messenger\Stamp\ConsumedByWorkerStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\SentStamp;
 use Symfony\Contracts\Service\ResetInterface;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
 
 /**
@@ -48,10 +49,6 @@ use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
  */
 final class OpenTelemetryMetricsMiddleware implements MiddlewareInterface, ResetInterface
 {
-    public const DURATION_BUCKET_BOUNDARIES = [
-        0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
-    ];
-
     private ?MeterInterface $meter = null;
     private ?HistogramInterface $duration = null;
     private ?CounterInterface $messages = null;
@@ -223,7 +220,7 @@ final class OpenTelemetryMetricsMiddleware implements MiddlewareInterface, Reset
             $this->metricName('duration'),
             's',
             'Duration of messaging processing operations',
-            ['ExplicitBucketBoundaries' => self::DURATION_BUCKET_BOUNDARIES],
+            ['ExplicitBucketBoundaries' => DurationBoundaries::SECONDS],
         );
     }
 
@@ -242,7 +239,7 @@ final class OpenTelemetryMetricsMiddleware implements MiddlewareInterface, Reset
             $this->metricName('dispatch_duration'),
             's',
             'Duration of messaging client send operations',
-            ['ExplicitBucketBoundaries' => self::DURATION_BUCKET_BOUNDARIES],
+            ['ExplicitBucketBoundaries' => DurationBoundaries::SECONDS],
         );
     }
 

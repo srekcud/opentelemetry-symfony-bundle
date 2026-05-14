@@ -9,6 +9,7 @@ use OpenTelemetry\API\Metrics\HistogramInterface;
 use OpenTelemetry\API\Metrics\MeterInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\SqlOperationExtractor;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
 
 /**
@@ -23,10 +24,6 @@ use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
  */
 final class DbMetricRecorder implements ResetInterface
 {
-    public const DURATION_BUCKET_BOUNDARIES = [
-        0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
-    ];
-
     private ?MeterInterface $meter = null;
     private ?HistogramInterface $duration = null;
 
@@ -97,7 +94,7 @@ final class DbMetricRecorder implements ResetInterface
             'db.client.operation.duration',
             's',
             'Duration of database client operations',
-            ['ExplicitBucketBoundaries' => self::DURATION_BUCKET_BOUNDARIES],
+            ['ExplicitBucketBoundaries' => DurationBoundaries::SECONDS],
         );
     }
 

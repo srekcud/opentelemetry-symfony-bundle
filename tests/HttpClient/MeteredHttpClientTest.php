@@ -10,6 +10,7 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Traceway\OpenTelemetryBundle\HttpClient\MeteredHttpClient;
 use Traceway\OpenTelemetryBundle\HttpClient\MeteredResponse;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
 final class MeteredHttpClientTest extends TestCase
@@ -317,7 +318,7 @@ final class MeteredHttpClientTest extends TestCase
         $metrics = $this->collectMetrics();
         $points = [...$metrics['http.client.request.duration']->data->dataPoints];
         self::assertSame(
-            MeteredHttpClient::DURATION_BUCKET_BOUNDARIES,
+            DurationBoundaries::SECONDS,
             $points[0]->explicitBounds,
         );
     }

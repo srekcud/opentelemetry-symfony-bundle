@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Mailer transport metrics** — new `MeteredTransports` decorator emits `messaging.client.operation.duration` (Histogram, `s`) and `messaging.client.sent.messages` (Counter, `{message}`) on outbound transport sends, with OTel messaging attributes (`messaging.system=symfony_mailer`, operation name/type, destination from `X-Transport` header, `error.type` on failure). Off by default; enable with `metrics.mailer.enabled: true`. Decoration priority places it inside the existing `TraceableTransports` so metric data points record within the active trace span scope, enabling SDK-level exemplar linkage from metric points back to traces.
+
+### Changed
+
+- **Internal: shared `DurationBoundaries::SECONDS` constant** — bucket boundaries for every second-based duration histogram in the bundle are now centralized in `Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries`. The previously public-but-undocumented per-class `DURATION_BUCKET_BOUNDARIES` constants on `MeteredHttpClient`, `OpenTelemetryMetricsMiddleware`, `OpenTelemetryMetricsSubscriber`, `DbMetricRecorder`, and `MeteredTransports` have been removed. If you reference any of them in your own code, switch to `DurationBoundaries::SECONDS`.
+
+### Fixed
+
+- **`HttpClientMetricsPass` decoration-priority comment** — was incorrect about Symfony's priority direction (claimed `MeteredHttpClient` wraps `TraceableHttpClient`; the actual decoration ordering is the inverse, with metrics recorded inside the active trace span scope). No behavior change — runtime ordering was already correct for exemplar linkage; only the explanatory comment was misleading future readers.
+
 ## [1.8.0] - 2026-05-11
 
 ### Added

@@ -23,6 +23,7 @@ use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetryMetricsSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetrySubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OtelLoggerFlushSubscriber;
 use Traceway\OpenTelemetryBundle\EventSubscriber\SchedulerSubscriber;
+use Traceway\OpenTelemetryBundle\Mailer\MeteredTransports;
 use Traceway\OpenTelemetryBundle\Mailer\TraceableMailer;
 use Traceway\OpenTelemetryBundle\Mailer\TraceableTransports;
 use Traceway\OpenTelemetryBundle\Messenger\OpenTelemetryMetricsMiddleware;
@@ -195,7 +196,7 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
             $container->setDefinition(TraceContextProcessor::class, $monologDef);
         }
 
-        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_server: array{enabled: bool, excluded_paths: list<string>}, http_client: array{enabled: bool, excluded_hosts: list<string>}} $metrics */
+        /** @var array{enabled: bool, meter_name: string, messenger: array{enabled: bool, excluded_queues: list<string>}, doctrine: array{enabled: bool}, http_server: array{enabled: bool, excluded_paths: list<string>}, http_client: array{enabled: bool, excluded_hosts: list<string>}, mailer: array{enabled: bool}} $metrics */
         $metrics = $config['metrics'];
         $meterName = $metrics['meter_name'];
 
@@ -234,6 +235,17 @@ final class OpenTelemetryExtension extends Extension implements PrependExtension
         $container->setParameter('open_telemetry.http_client_metrics_enabled', $httpClientMetricsEnabled);
         $container->setParameter('open_telemetry.metrics_meter_name', $meterName);
         $container->setParameter('open_telemetry.http_client_metrics_excluded_hosts', $metrics['http_client']['excluded_hosts']);
+
+        if ($metrics['enabled'] && $metrics['mailer']['enabled'] && $this->isMailerAvailable()) {
+            // Priority 8 places this decorator INSIDE TraceableTransports (priority 0).
+            // In Symfony decoration, higher priority = deeper nesting (see DecoratorServicePass).
+            // Recording inside the active trace span scope enables SDK exemplar linkage.
+            $meteredTransportsDef = new Definition(MeteredTransports::class);
+            $meteredTransportsDef->setDecoratedService('mailer.transports', null, 8, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+            $meteredTransportsDef->setArgument('$decorated', new Reference('.inner'));
+            $meteredTransportsDef->setArgument('$meterName', $meterName);
+            $container->setDefinition(MeteredTransports::class, $meteredTransportsDef);
+        }
     }
 
     private function isConsoleAvailable(): bool
