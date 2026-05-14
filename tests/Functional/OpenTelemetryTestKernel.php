@@ -19,6 +19,10 @@ final class OpenTelemetryTestKernel extends Kernel
      * test-lifecycle teardown, two consecutive test kernels could share an ID
      * and the second would load the first's compiled container from disk,
      * silently masking the new test's config.
+     *
+     * The cache path also includes getmypid() so concurrent PHP processes
+     * (paratest, accidental parallel invocations) don't collide on a shared
+     * counter value of 1, 2, etc.
      */
     private static int $instanceCounter = 0;
 
@@ -95,7 +99,7 @@ final class OpenTelemetryTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/otel_bundle_tests/' . $this->instanceId;
+        return sys_get_temp_dir() . '/otel_bundle_tests/' . getmypid() . '_' . $this->instanceId;
     }
 
     public function getLogDir(): string
