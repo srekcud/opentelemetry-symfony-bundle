@@ -6,13 +6,12 @@ namespace Traceway\OpenTelemetryBundle\Tests\Doctrine\Middleware;
 
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Traceway\OpenTelemetryBundle\Doctrine\Metrics\DbMetricRecorder;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
-/**
- * @group dbal3
- */
+#[Group('dbal3')]
 final class MeteredStatementDbal3Test extends TestCase
 {
     use OTelTestTrait;

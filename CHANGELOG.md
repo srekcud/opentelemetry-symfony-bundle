@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`HttpClientMetricsPass` decoration-priority comment** — was incorrect about Symfony's priority direction (claimed `MeteredHttpClient` wraps `TraceableHttpClient`; the actual decoration ordering is the inverse, with metrics recorded inside the active trace span scope). No behavior change — runtime ordering was already correct for exemplar linkage; only the explanatory comment was misleading future readers.
+- **`OpenTelemetryTestKernel` cache directory collision under PHPUnit 13** — the test kernel keyed its cache directory on `spl_object_id($this)`, which PHP recycles after garbage collection. Under PHPUnit 13's earlier teardown lifecycle, a second test could be assigned the same object ID as a destroyed first kernel and silently load the previous test's compiled container — masking its own config and producing flaky failures in `BundleBootTest`. Now uses a monotonic per-process counter so every kernel instance gets a unique cache dir.
+
+### Maintenance
+
+- **PHPUnit 13 compatibility** — every `@dataProvider` and `@group` docblock annotation across `tests/Doctrine/Middleware/` was migrated to the PHP 8 attribute equivalents (`#[DataProvider]`, `#[Group]`). PHPUnit 13 removed support for docblock metadata; under it, unmigrated `@dataProvider` annotations silently fall through to argument-less invocation and throw `ArgumentCountError`. `phpunit/phpunit` require-dev constraint expanded to `^10.0 || ^11.0 || ^13.0` so the existing CI matrix (PHP 8.1 through 8.4) picks the highest compatible version on each row.
 
 ## [1.8.0] - 2026-05-11
 
