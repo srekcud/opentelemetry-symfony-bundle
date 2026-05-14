@@ -49,7 +49,7 @@ use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
  */
 final class OpenTelemetryMetricsSubscriber implements EventSubscriberInterface, ResetInterface
 {
-/** @var list<string> */
+    /** @var list<string> */
     private readonly array $excludedPaths;
 
     private ?MeterInterface $meter = null;

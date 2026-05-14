@@ -24,7 +24,7 @@ use Traceway\OpenTelemetryBundle\Util\ErrorTypeResolver;
  */
 final class DbMetricRecorder implements ResetInterface
 {
-private ?MeterInterface $meter = null;
+    private ?MeterInterface $meter = null;
     private ?HistogramInterface $duration = null;
 
     public function __construct(
