@@ -221,6 +221,16 @@ final class Configuration implements ConfigurationInterface
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('mailer')
+                            ->info('Automatic metrics for Symfony Mailer transport sends.')
+                            ->addDefaultsIfNotSet()
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->info('Emit messaging.client.operation.duration (histogram) and messaging.client.sent.messages (counter) on outbound transport sends. Requires metrics.enabled and symfony/mailer.')
+                                    ->defaultFalse()
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                     ->validate()
                         ->ifTrue(static function (array $c): bool {
@@ -249,6 +259,13 @@ final class Configuration implements ConfigurationInterface
                             return true === ($httpClient['enabled'] ?? false) && true !== ($c['enabled'] ?? false);
                         })
                         ->thenInvalid('"open_telemetry.metrics.http_client.enabled" requires "open_telemetry.metrics.enabled" to be true.')
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static function (array $c): bool {
+                            $mailer = \is_array($c['mailer'] ?? null) ? $c['mailer'] : [];
+                            return true === ($mailer['enabled'] ?? false) && true !== ($c['enabled'] ?? false);
+                        })
+                        ->thenInvalid('"open_telemetry.metrics.mailer.enabled" requires "open_telemetry.metrics.enabled" to be true.')
                     ->end()
                 ->end()
             ->end()

@@ -16,6 +16,7 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Traceway\OpenTelemetryBundle\EventSubscriber\OpenTelemetryMetricsSubscriber;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
 final class OpenTelemetryMetricsSubscriberTest extends TestCase
@@ -154,7 +155,7 @@ final class OpenTelemetryMetricsSubscriberTest extends TestCase
         $metrics = $this->collectMetrics();
         $points = [...$metrics['http.server.request.duration']->data->dataPoints];
         self::assertSame(
-            OpenTelemetryMetricsSubscriber::DURATION_BUCKET_BOUNDARIES,
+            DurationBoundaries::SECONDS,
             $points[0]->explicitBounds,
         );
     }

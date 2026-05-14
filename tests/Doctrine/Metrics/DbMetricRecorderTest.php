@@ -7,6 +7,7 @@ namespace Traceway\OpenTelemetryBundle\Tests\Doctrine\Metrics;
 use OpenTelemetry\API\Metrics\HistogramInterface;
 use PHPUnit\Framework\TestCase;
 use Traceway\OpenTelemetryBundle\Doctrine\Metrics\DbMetricRecorder;
+use Traceway\OpenTelemetryBundle\Metrics\DurationBoundaries;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
 final class DbMetricRecorderTest extends TestCase
@@ -113,7 +114,7 @@ final class DbMetricRecorderTest extends TestCase
         $points = [...$metrics['db.client.operation.duration']->data->dataPoints];
 
         self::assertSame(
-            DbMetricRecorder::DURATION_BUCKET_BOUNDARIES,
+            DurationBoundaries::SECONDS,
             $points[0]->explicitBounds,
         );
     }

@@ -19,7 +19,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/9tPn2SB3)
 
-Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Mailer, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger, DBAL, and HTTP server/client. No C extension required.
+Pure-PHP OpenTelemetry instrumentation for Symfony — automatic tracing for HTTP, Console, HttpClient, Messenger, Mailer, Scheduler, Doctrine DBAL, Cache, and Twig, plus Monolog log-trace correlation, OpenTelemetry log export, and opt-in metrics for Messenger, DBAL, HTTP server/client, and Mailer. No C extension required.
 
 Works with any OpenTelemetry-compatible backend: [Traceway](https://tracewayapp.com), [Jaeger](https://www.jaegertracing.io/), [Zipkin](https://zipkin.io/), [Datadog](https://www.datadoghq.com/), [Grafana Tempo](https://grafana.com/oss/tempo/), [Honeycomb](https://www.honeycomb.io/), and more.
 
@@ -121,6 +121,8 @@ open_telemetry:
         http_client:
             enabled: false
             excluded_hosts: []         # OTLP endpoint is auto-excluded
+        mailer:
+            enabled: false
 ```
 
 ### Environment Variables
@@ -165,7 +167,7 @@ Mock in tests with `$this->createStub(TracingInterface::class)` and have `trace(
 
 ## Metrics
 
-**Off by default.** Enable to export OpenTelemetry metrics alongside traces, with opt-in automatic instrumentation for Messenger, Doctrine DBAL, and HTTP server/client.
+**Off by default.** Enable to export OpenTelemetry metrics alongside traces, with opt-in automatic instrumentation for Messenger, Doctrine DBAL, HTTP server/client, and Mailer.
 
 ```yaml
 open_telemetry:
@@ -208,6 +210,15 @@ Names and attributes follow OTel semantic conventions ([messaging](https://opent
 | `http.client.response.body.size` | Histogram | `By` | Development | Same as duration (emitted when response `Content-Length` is set or the body is fully read) |
 
 `http_client.excluded_hosts` skips matching hostnames; the OTLP endpoint (from `OTEL_EXPORTER_OTLP_ENDPOINT`) is always auto-excluded to prevent instrumentation loops.
+
+**Mailer** (outbound transport sends):
+
+| Instrument | Kind | Unit | Stability | Attributes |
+|---|---|---|---|---|
+| `messaging.client.operation.duration` | Histogram | `s` | Development | `messaging.system=symfony_mailer`, `messaging.operation.name=send`, `messaging.operation.type=send`, `messaging.destination.name` from `X-Transport` header when present, `error.type` on failure |
+| `messaging.client.sent.messages` | Counter | `{message}` | Development | Same as duration |
+
+Decoration sits inside `TraceableTransports` so metric points record while the trace span is still active — backends that support exemplars can link directly from a metric data point to the corresponding trace.
 
 ### Manual Metrics
 

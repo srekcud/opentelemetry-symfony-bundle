@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Traceway\OpenTelemetryBundle\Tests\DependencyInjection;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 use Traceway\OpenTelemetryBundle\DependencyInjection\Configuration;
 
@@ -137,6 +139,58 @@ final class ConfigurationTest extends TestCase
         ]]);
 
         self::assertSame([], $config['metrics']['http_server']['excluded_paths']);
+    }
+
+    /**
+     * Each per-subsystem metrics toggle should fail validation when the master
+     * metrics.enabled flag is false. The rule lives in Configuration's validate()
+     * chain and is structurally identical across all five subsystems, so we run
+     * the same assertion against each via DataProvider.
+     *
+     * Forward-compatible with PHPUnit 13 (attribute syntax). Docblock
+     * @ dataProvider would also work on PHPUnit 11 but is removed in 13 — see
+     * the PHPUnit 13 migration item in CLAUDE.md.
+     */
+    #[DataProvider('metricsSubsystemProvider')]
+    public function testMetricsSubsystemRequiresMetricsEnabled(string $subsystem): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(sprintf(
+            '"open_telemetry.metrics.%s.enabled" requires "open_telemetry.metrics.enabled" to be true.',
+            $subsystem,
+        ));
+
+        $this->process([[
+            'metrics' => [
+                'enabled' => false,
+                $subsystem => ['enabled' => true],
+            ],
+        ]]);
+    }
+
+    #[DataProvider('metricsSubsystemProvider')]
+    public function testMetricsSubsystemCanBeEnabledWhenMetricsEnabled(string $subsystem): void
+    {
+        $config = $this->process([[
+            'metrics' => [
+                'enabled' => true,
+                $subsystem => ['enabled' => true],
+            ],
+        ]]);
+
+        self::assertTrue($config['metrics'][$subsystem]['enabled']);
+    }
+
+    /**
+     * @return \Generator<string, array{string}>
+     */
+    public static function metricsSubsystemProvider(): \Generator
+    {
+        yield 'messenger' => ['messenger'];
+        yield 'doctrine' => ['doctrine'];
+        yield 'http_server' => ['http_server'];
+        yield 'http_client' => ['http_client'];
+        yield 'mailer' => ['mailer'];
     }
 
     /**
