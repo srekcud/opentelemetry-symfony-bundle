@@ -7,15 +7,14 @@ namespace Traceway\OpenTelemetryBundle\Tests\Doctrine\Middleware;
 use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Traceway\OpenTelemetryBundle\Doctrine\Metrics\DbMetricRecorder;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\MeteredConnectionDbal4;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\MeteredStatementDbal4;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
-/**
- * @group dbal4
- */
+#[Group('dbal4')]
 final class MeteredConnectionTest extends TestCase
 {
     use OTelTestTrait;

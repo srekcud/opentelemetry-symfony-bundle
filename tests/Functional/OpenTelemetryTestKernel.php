@@ -12,6 +12,22 @@ use Traceway\OpenTelemetryBundle\OpenTelemetryBundle;
 
 final class OpenTelemetryTestKernel extends Kernel
 {
+    /**
+     * Monotonically increasing per-process counter used to give every kernel
+     * instance a unique cache directory. spl_object_id() is unsuitable here
+     * because PHP recycles object IDs after GC — under PHPUnit 13's faster
+     * test-lifecycle teardown, two consecutive test kernels could share an ID
+     * and the second would load the first's compiled container from disk,
+     * silently masking the new test's config.
+     *
+     * The cache path also includes getmypid() so concurrent PHP processes
+     * (paratest, accidental parallel invocations) don't collide on a shared
+     * counter value of 1, 2, etc.
+     */
+    private static int $instanceCounter = 0;
+
+    private readonly int $instanceId;
+
     /** @var array<string, mixed> */
     private array $otelConfig;
 
@@ -26,6 +42,7 @@ final class OpenTelemetryTestKernel extends Kernel
         array $otelConfig = [],
         array $extraBundles = [],
     ) {
+        $this->instanceId = ++self::$instanceCounter;
         $this->otelConfig = $otelConfig;
         $this->extraBundles = $extraBundles;
 
@@ -82,7 +99,7 @@ final class OpenTelemetryTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/otel_bundle_tests/' . spl_object_id($this);
+        return sys_get_temp_dir() . '/otel_bundle_tests/' . getmypid() . '_' . $this->instanceId;
     }
 
     public function getLogDir(): string

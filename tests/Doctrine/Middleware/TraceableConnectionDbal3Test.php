@@ -9,6 +9,7 @@ use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
 
@@ -17,9 +18,8 @@ use Traceway\OpenTelemetryBundle\Tests\OTelTestTrait;
  *
  * These tests can only run when doctrine/dbal ^3.6 is installed.
  * With DBAL 4, the Dbal3 classes cannot be loaded (incompatible return types).
- *
- * @group dbal3
  */
+#[Group('dbal3')]
 final class TraceableConnectionDbal3Test extends TestCase
 {
     use OTelTestTrait;

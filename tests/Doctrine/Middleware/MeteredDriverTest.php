@@ -6,6 +6,7 @@ namespace Traceway\OpenTelemetryBundle\Tests\Doctrine\Middleware;
 
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Driver\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\MeteredConnectionDbal3;
 use Traceway\OpenTelemetryBundle\Doctrine\Middleware\MeteredConnectionDbal4;
@@ -45,9 +46,7 @@ final class MeteredDriverTest extends TestCase
         yield 'empty' => ['', 'other_sql'];
     }
 
-    /**
-     * @dataProvider dbSystemProvider
-     */
+    #[DataProvider('dbSystemProvider')]
     public function testResolvesDbSystemFromDriverString(string $driverName, string $expectedSystem): void
     {
         $inner = $this->createStub(Driver::class);
